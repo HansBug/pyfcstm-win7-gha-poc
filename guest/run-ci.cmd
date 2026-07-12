@@ -3,7 +3,7 @@ setlocal EnableExtensions DisableDelayedExpansion
 
 set "RUN_DIRECTORY=%SystemDrive%\pyfcstm-win7-poc"
 set "PAYLOAD_DRIVE="
-set "RESULT_DRIVE=D:"
+set "RESULT_DRIVE="
 set "STATUS=FAIL"
 set "FAILURE=unknown"
 
@@ -13,7 +13,13 @@ for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
 )
 
 ping 127.0.0.1 -n 6 >nul
-for /f "tokens=2 delims==" %%D in ('wmic logicaldisk where "VolumeName='PYFCSTMRES'" get DeviceID /value ^| find "="') do set "RESULT_DRIVE=%%D"
+for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
+    vol %%D: 2>nul | findstr /I /C:"PYFCSTMRES" >nul
+    if not errorlevel 1 set "RESULT_DRIVE=%%D:"
+)
+if not defined RESULT_DRIVE (
+    for /f "tokens=2 delims==" %%D in ('wmic logicaldisk where "VolumeName='PYFCSTMRES'" get DeviceID /value ^| find "="') do set "RESULT_DRIVE=%%D"
+)
 
 if not exist "%RESULT_DRIVE%\" set "RESULT_DRIVE="
 if not defined RESULT_DRIVE goto :shutdown
@@ -34,6 +40,7 @@ if not exist "%RUN_DIRECTORY%\api-ms-win-core-sysinfo-l1-2-0.dll" (
     set "FAILURE=API-set compatibility shim copy failed"
     goto :finish
 )
+set "PATH=%RUN_DIRECTORY%;%PATH%"
 
 call "%PAYLOAD_DRIVE%\verify-cli.cmd" "%RUN_DIRECTORY%" > "%RUN_DIRECTORY%\verify-cli.log" 2>&1
 if errorlevel 1 (
