@@ -14,6 +14,12 @@ The workflow uses only GitHub-hosted runners:
    Windows standalone build path with Python 3.7. The PoC pins
    `PyInstaller==4.10`: its documentation still says Windows 7 should work,
    while PyInstaller 5 and later list Windows 8 as the support floor.
+   Before packaging, the PoC filters only `api-ms-win-core-*` Windows 10
+   API-set stubs from the transient generated spec. A current hosted runner
+   resolves these physical `System32\\downlevel` stubs and PyInstaller would
+   otherwise archive them; they are OS forwarders and fail to load on a clean
+   Windows 7 guest. Universal CRT files (`api-ms-win-crt-*`, `ucrtbase.dll`,
+   and `vcruntime140.dll`) remain bundled.
 2. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
    Windows 7 virtual disk for this run.
 3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
