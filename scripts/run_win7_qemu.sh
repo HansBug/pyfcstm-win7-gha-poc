@@ -48,6 +48,7 @@ qemu-system-x86_64 \
     -m 3072 \
     -smp 2 \
     -rtc base=localtime \
+    -nic none \
     -boot once=d,order=c \
     -drive "file=$system_disk,if=ide,media=disk,format=qcow2" \
     -drive "file=$install_iso,if=ide,media=cdrom,readonly=on" \
