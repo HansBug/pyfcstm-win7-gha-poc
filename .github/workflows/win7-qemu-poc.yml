@@ -221,8 +221,7 @@ jobs:
           work_dir="$RUNNER_TEMP/win7-poc"
           mkdir -p "$work_dir"
           install_iso="$work_dir/windows-7.iso"
-          curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
-            --output "$install_iso" "$WIN7_ISO_URL"
+          bash scripts/download_with_ranges.sh "$WIN7_ISO_URL" "$install_iso"
           printf '%s  %s\n' "$WIN7_ISO_SHA256" "$install_iso" | sha256sum --check --status -
 
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
