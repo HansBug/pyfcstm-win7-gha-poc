@@ -112,6 +112,30 @@ jobs:
         with:
           python-version: "3.7"
 
+      - name: Build the Windows 7 API-set compatibility shim
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $link = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\link.exe' |
+            Select-Object -First 1
+          if (-not $link) {
+            throw 'Could not locate the x64 Microsoft linker.'
+          }
+          $shimDirectory = Join-Path $env:GITHUB_WORKSPACE 'build-api-set-shim'
+          New-Item -ItemType Directory -Force -Path $shimDirectory | Out-Null
+          $shim = Join-Path $shimDirectory 'api-ms-win-core-sysinfo-l1-2-0.dll'
+          & $link /DLL /NOENTRY /MACHINE:X64 `
+            "/DEF:$env:GITHUB_WORKSPACE\guest\api-ms-win-core-sysinfo-l1-2-0.def" `
+            "/OUT:$shim"
+          if ($LASTEXITCODE -ne 0) {
+            throw "link.exe failed with exit code $LASTEXITCODE."
+          }
+          if (-not (Test-Path -Path $shim -PathType Leaf)) {
+            throw 'The Windows 7 API-set shim was not created.'
+          }
+
       - name: Build Windows 7-compatible standalone CLI from pyfcstm main
         shell: bash
         env:
@@ -144,6 +168,8 @@ jobs:
           payload_dir="$GITHUB_WORKSPACE/build-payload"
           mkdir -p "$payload_dir"
           cp "$source_dir/dist/pyfcstm.exe" "$payload_dir/pyfcstm.exe"
+          cp "$GITHUB_WORKSPACE/build-api-set-shim/api-ms-win-core-sysinfo-l1-2-0.dll" \
+            "$payload_dir/api-ms-win-core-sysinfo-l1-2-0.dll"
           cp "$source_dir/docs/source/tutorials/simulation/example6_transition_priority.full.fcstm" \
             "$payload_dir/smt-verify.fcstm"
           exe_sha256="$(python -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest().upper())' "$payload_dir/pyfcstm.exe")"

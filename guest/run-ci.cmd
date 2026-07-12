@@ -24,9 +24,14 @@ if not defined PAYLOAD_DRIVE (
 )
 
 copy /Y "%PAYLOAD_DRIVE%\pyfcstm.exe" "%RUN_DIRECTORY%\pyfcstm.exe" >nul
+copy /Y "%PAYLOAD_DRIVE%\api-ms-win-core-sysinfo-l1-2-0.dll" "%RUN_DIRECTORY%\api-ms-win-core-sysinfo-l1-2-0.dll" >nul
 copy /Y "%PAYLOAD_DRIVE%\smt-verify.fcstm" "%RUN_DIRECTORY%\smt-verify.fcstm" >nul
 if not exist "%RUN_DIRECTORY%\pyfcstm.exe" (
     set "FAILURE=executable copy failed"
+    goto :finish
+)
+if not exist "%RUN_DIRECTORY%\api-ms-win-core-sysinfo-l1-2-0.dll" (
+    set "FAILURE=API-set compatibility shim copy failed"
     goto :finish
 )
 
