@@ -97,11 +97,14 @@ jobs:
         shell: bash
         env:
           IS_WIN: "1"
+          PYINSTALLER_VERSION: "4.10"
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/_source/pyfcstm"
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-build.txt
+          python -m pip install --upgrade --force-reinstall "pyinstaller==${PYINSTALLER_VERSION}"
+          python -c 'import PyInstaller; assert PyInstaller.__version__ == "4.10"'
           make build
           test -f dist/pyfcstm.exe
           ./dist/pyfcstm.exe -v

@@ -11,7 +11,9 @@ upstream DSL fixture to the guest job as a short-lived Actions artifact.
 The workflow uses only GitHub-hosted runners:
 
 1. `windows-2022` checks out `HansBug/pyfcstm@main` and runs its existing
-   Windows standalone build path with Python 3.7.
+   Windows standalone build path with Python 3.7. The PoC pins
+   `PyInstaller==4.10`: its documentation still says Windows 7 should work,
+   while PyInstaller 5 and later list Windows 8 as the support floor.
 2. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
    Windows 7 virtual disk for this run.
 3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
@@ -100,3 +102,5 @@ The runner and product constraints are documented by GitHub and Microsoft:
 The PyInstaller link is why the guest execution is a real compatibility gate:
 the documented support floor for that release is Windows 8, so a build that
 succeeds on Windows 2022 cannot establish Windows 7 compatibility by itself.
+For comparison, [PyInstaller 4.10 requirements](https://pyinstaller.org/en/v4.10/requirements.html)
+state that Windows 7 should work, although it was not a supported platform.
