@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-    echo "usage: $0 PAYLOAD_DIRECTORY OUTPUT_ISO WIN7_IMAGE_INDEX" >&2
+if [[ $# -ne 4 ]]; then
+    echo "usage: $0 PAYLOAD_DIRECTORY OUTPUT_ISO WIN7_IMAGE_INDEX WIN7_LOCALE" >&2
     exit 64
 fi
 
 payload_directory=$1
 output_iso=$2
 image_index=$3
+locale=$4
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 [[ -d "$payload_directory" ]] || {
@@ -17,6 +18,10 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 }
 [[ "$image_index" =~ ^[1-9][0-9]*$ ]] || {
     echo "Windows image index must be a positive integer" >&2
+    exit 64
+}
+[[ "$locale" =~ ^[[:alpha:]]{2,3}-[[:alpha:]]{2,4}$ ]] || {
+    echo "Windows locale must use a language-region form such as en-US or zh-CN" >&2
     exit 64
 }
 
@@ -33,7 +38,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-sed "s/__WIN7_IMAGE_INDEX__/$image_index/g" \
+sed \
+    -e "s/__WIN7_IMAGE_INDEX__/$image_index/g" \
+    -e "s/__WIN7_LOCALE__/$locale/g" \
     "$repository_root/guest/Autounattend.xml" > "$staging_directory/Autounattend.xml"
 cp "$repository_root/guest/run-ci.cmd" "$staging_directory/run-ci.cmd"
 cp "$repository_root/guest/verify-cli.cmd" "$staging_directory/verify-cli.cmd"

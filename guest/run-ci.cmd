@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 
-set "RUN_DIRECTORY=C:\pyfcstm-win7-poc"
+set "RUN_DIRECTORY=%USERPROFILE%\pyfcstm-win7-poc"
 set "PAYLOAD_DRIVE="
 set "RESULT_DRIVE="
 set "STATUS=FAIL"

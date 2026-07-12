@@ -9,12 +9,12 @@
                language="neutral"
                versionScope="nonSxS">
       <SetupUILanguage>
-        <UILanguage>en-US</UILanguage>
+        <UILanguage>__WIN7_LOCALE__</UILanguage>
       </SetupUILanguage>
-      <InputLocale>en-US</InputLocale>
-      <SystemLocale>en-US</SystemLocale>
-      <UILanguage>en-US</UILanguage>
-      <UserLocale>en-US</UserLocale>
+      <InputLocale>__WIN7_LOCALE__</InputLocale>
+      <SystemLocale>__WIN7_LOCALE__</SystemLocale>
+      <UILanguage>__WIN7_LOCALE__</UILanguage>
+      <UserLocale>__WIN7_LOCALE__</UserLocale>
     </component>
     <component name="Microsoft-Windows-Setup"
                processorArchitecture="amd64"
@@ -84,10 +84,10 @@
                publicKeyToken="31bf3856ad364e35"
                language="neutral"
                versionScope="nonSxS">
-      <InputLocale>en-US</InputLocale>
-      <SystemLocale>en-US</SystemLocale>
-      <UILanguage>en-US</UILanguage>
-      <UserLocale>en-US</UserLocale>
+      <InputLocale>__WIN7_LOCALE__</InputLocale>
+      <SystemLocale>__WIN7_LOCALE__</SystemLocale>
+      <UILanguage>__WIN7_LOCALE__</UILanguage>
+      <UserLocale>__WIN7_LOCALE__</UserLocale>
     </component>
     <component name="Microsoft-Windows-Shell-Setup"
                processorArchitecture="amd64"
@@ -118,7 +118,6 @@
               <PlainText>true</PlainText>
             </Password>
             <DisplayName>CI</DisplayName>
-            <Group>Administrators</Group>
             <Name>ci</Name>
           </LocalAccount>
         </LocalAccounts>

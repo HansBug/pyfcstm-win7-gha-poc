@@ -32,7 +32,7 @@ grep -Fx 'Version=6.1.7601' "$output_directory/os.txt" >/dev/null
 grep -Fx 'BuildNumber=7601' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ServicePackMajorVersion=1' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ProductType=1' "$output_directory/os.txt" >/dev/null
-grep -Fx 'OSArchitecture=64-bit' "$output_directory/os.txt" >/dev/null
+grep -E '^OSArchitecture=(64-bit|64 位)' "$output_directory/os.txt" >/dev/null
 
 actual_exe_sha256=$(grep -Eio '[A-F0-9]{64}' "$output_directory/hash.txt" | head -n 1 | tr '[:lower:]' '[:upper:]')
 [[ "$actual_exe_sha256" == "$expected_exe_sha256" ]] || {

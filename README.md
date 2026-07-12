@@ -46,6 +46,7 @@ dispatching the workflow:
 | `WIN7_ISO_URL` | Actions secret | HTTPS URL to an ISO that the repository owner is authorized to use |
 | `WIN7_ISO_SHA256` | Actions secret | SHA-256 of that exact ISO |
 | `WIN7_IMAGE_INDEX` | Actions variable | Positive `install.wim` image index for Windows 7 SP1 x64 |
+| `WIN7_LOCALE` | Actions variable | ISO UI language in the form `en-US` or `zh-CN`, defaults to `en-US` |
 
 The `workflow_dispatch` form can temporarily replace all three values. This
 is useful for testing a new authorized ISO without changing saved settings.

@@ -15,6 +15,10 @@ on:
         description: Optional replacement for the WIN7_IMAGE_INDEX repository variable.
         required: false
         type: string
+      win7_locale:
+        description: Optional replacement for the WIN7_LOCALE repository variable.
+        required: false
+        type: string
   repository_dispatch:
     types: [verify-pyfcstm-main]
   schedule:
@@ -35,6 +39,7 @@ jobs:
       WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
       WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
       WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
+      WIN7_LOCALE: ${{ inputs.win7_locale || vars.WIN7_LOCALE || 'en-US' }}
     steps:
       - name: Validate the licensed installation-media configuration
         shell: bash
@@ -50,6 +55,10 @@ jobs:
           }
           [[ "$WIN7_IMAGE_INDEX" =~ ^[1-9][0-9]*$ ]] || {
             echo "WIN7_IMAGE_INDEX must be a positive install.wim image index."
+            exit 2
+          }
+          [[ "$WIN7_LOCALE" =~ ^[[:alpha:]]{2,3}-[[:alpha:]]{2,4}$ ]] || {
+            echo "WIN7_LOCALE must use a language-region form such as en-US or zh-CN."
             exit 2
           }
 
@@ -148,6 +157,7 @@ jobs:
       WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
       WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
       WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
+      WIN7_LOCALE: ${{ inputs.win7_locale || vars.WIN7_LOCALE || 'en-US' }}
     steps:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
@@ -172,6 +182,10 @@ jobs:
           }
           [[ "$WIN7_IMAGE_INDEX" =~ ^[1-9][0-9]*$ ]] || {
             echo "WIN7_IMAGE_INDEX must be a positive install.wim image index."
+            exit 2
+          }
+          [[ "$WIN7_LOCALE" =~ ^[[:alpha:]]{2,3}-[[:alpha:]]{2,4}$ ]] || {
+            echo "WIN7_LOCALE must use a language-region form such as en-US or zh-CN."
             exit 2
           }
 
@@ -212,7 +226,7 @@ jobs:
           printf '%s  %s\n' "$WIN7_ISO_SHA256" "$install_iso" | sha256sum --check --status -
 
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
-          bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX"
+          bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
           truncate -s 64M "$work_dir/win7-results.img"
           mkfs.fat -F 32 -n PYFCSTMRESULTS "$work_dir/win7-results.img"
 
