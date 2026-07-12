@@ -244,7 +244,7 @@ jobs:
           fi
           cat "$image_info"
           grep -E '^Name:.*Windows 7' "$image_info" >/dev/null
-          grep -E '^Architecture: x86_64' "$image_info" >/dev/null
+          grep -E '^Architecture:[[:space:]]+x86_64' "$image_info" >/dev/null
           rm -rf "$inspection_dir"
 
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
