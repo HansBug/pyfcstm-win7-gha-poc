@@ -238,7 +238,11 @@ jobs:
           df -h "$work_dir"
           7z e -y "-o$inspection_dir" "$install_iso" sources/install.wim
           image_info="$work_dir/install-image-info.txt"
-          wimlib-imagex info "$inspection_dir/install.wim" "$WIN7_IMAGE_INDEX" > "$image_info"
+          if ! wimlib-imagex info "$inspection_dir/install.wim" "$WIN7_IMAGE_INDEX" > "$image_info"; then
+            cat "$image_info"
+            exit 1
+          fi
+          cat "$image_info"
           grep -E '^Name:.*Windows 7' "$image_info" >/dev/null
           grep -E '^Architecture: x86_64' "$image_info" >/dev/null
           rm -rf "$inspection_dir"
