@@ -307,6 +307,7 @@ jobs:
           path: |
             ${{ runner.temp }}/win7-poc/serial.log
             ${{ runner.temp }}/win7-poc/qemu-screen.ppm
+            ${{ runner.temp }}/win7-poc/qemu-exit-status.txt
             ${{ runner.temp }}/win7-poc/win7-results.img
             ${{ steps.media.outputs.image_info }}
             guest-evidence

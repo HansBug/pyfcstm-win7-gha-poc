@@ -33,12 +33,20 @@ system_disk="$work_directory/win7-system.qcow2"
 serial_log="$work_directory/serial.log"
 monitor_socket="$work_directory/qemu-monitor.sock"
 screenshot="$work_directory/qemu-screen.ppm"
-rm -f "$system_disk" "$serial_log" "$monitor_socket" "$screenshot"
+exit_status_file="$work_directory/qemu-exit-status.txt"
+rm -f "$system_disk" "$serial_log" "$monitor_socket" "$screenshot" "$exit_status_file"
 qemu-img create -f qcow2 "$system_disk" 24G >/dev/null
 
 capture_screen() {
     [[ -S "$monitor_socket" ]] || return 0
     printf 'screendump %s\n' "$screenshot" | timeout 5 nc -U "$monitor_socket" >/dev/null 2>&1 || true
+}
+
+capture_screen_periodically() {
+    while kill -0 "$qemu_pid" 2>/dev/null; do
+        capture_screen
+        sleep 30
+    done
 }
 
 qemu-system-x86_64 \
@@ -60,6 +68,8 @@ qemu-system-x86_64 \
     -monitor "unix:$monitor_socket,server,nowait" \
     -serial "file:$serial_log" &
 qemu_pid=$!
+capture_screen_periodically &
+capture_pid=$!
 deadline=$((SECONDS + timeout_seconds))
 qemu_status=0
 
@@ -77,6 +87,9 @@ while kill -0 "$qemu_pid" 2>/dev/null; do
     sleep 5
 done
 
+kill "$capture_pid" 2>/dev/null || true
+wait "$capture_pid" 2>/dev/null || true
+
 if [[ "$qemu_status" -eq 0 ]]; then
     set +e
     wait "$qemu_pid"
@@ -87,6 +100,8 @@ else
     wait "$qemu_pid"
     set -e
 fi
+
+printf '%s\n' "$qemu_status" > "$exit_status_file"
 
 if [[ $qemu_status -eq 124 ]]; then
     echo "Windows guest did not shut down within ${timeout_seconds} seconds." >&2
