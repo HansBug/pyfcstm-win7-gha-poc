@@ -49,10 +49,11 @@ dispatching the workflow:
 | `WIN7_LOCALE` | Actions variable | ISO UI language in the form `en-US` or `zh-CN`, defaults to `en-US` |
 | `WIN7_ISO_FALLBACK_URLS` | Actions variable | Optional newline-separated alternate URLs for the same hash-verified ISO |
 
-The `workflow_dispatch` form can temporarily replace all three values. This
-is useful for testing a new authorized ISO without changing saved settings.
-The ISO is downloaded to the ephemeral runner, checked before use, never
-cached, and not uploaded as an artifact.
+The `workflow_dispatch` form can temporarily replace the media URL, digest,
+image index, locale, and QEMU timeout. This is useful for testing a new
+authorized ISO or collecting a bounded diagnostic capture without changing
+saved settings. The ISO is downloaded to the ephemeral runner, checked before
+use, never cached, and not uploaded as an artifact.
 
 Windows 7 media licensing is not solved by technical automation. A public
 download URL is an availability mechanism, not a license grant: the repository
