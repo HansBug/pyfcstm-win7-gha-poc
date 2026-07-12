@@ -19,6 +19,10 @@ on:
         description: Optional replacement for the WIN7_LOCALE repository variable.
         required: false
         type: string
+      qemu_timeout_seconds:
+        description: Optional QEMU guest timeout in seconds, defaults to 5400.
+        required: false
+        type: string
   repository_dispatch:
     types: [verify-pyfcstm-main]
   schedule:
@@ -41,6 +45,7 @@ jobs:
       WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
       WIN7_LOCALE: ${{ inputs.win7_locale || vars.WIN7_LOCALE || 'en-US' }}
       WIN7_ISO_FALLBACK_URLS: ${{ vars.WIN7_ISO_FALLBACK_URLS }}
+      QEMU_TIMEOUT_SECONDS: ${{ inputs.qemu_timeout_seconds || '5400' }}
     steps:
       - name: Validate the licensed installation-media configuration
         shell: bash
@@ -60,6 +65,10 @@ jobs:
           }
           [[ "$WIN7_LOCALE" =~ ^[[:alpha:]]{2,3}-[[:alpha:]]{2,4}$ ]] || {
             echo "WIN7_LOCALE must use a language-region form such as en-US or zh-CN."
+            exit 2
+          }
+          [[ "$QEMU_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || {
+            echo "QEMU_TIMEOUT_SECONDS must be a positive integer."
             exit 2
           }
 
@@ -160,6 +169,7 @@ jobs:
       WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
       WIN7_LOCALE: ${{ inputs.win7_locale || vars.WIN7_LOCALE || 'en-US' }}
       WIN7_ISO_FALLBACK_URLS: ${{ vars.WIN7_ISO_FALLBACK_URLS }}
+      QEMU_TIMEOUT_SECONDS: ${{ inputs.qemu_timeout_seconds || '5400' }}
     steps:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
@@ -188,6 +198,10 @@ jobs:
           }
           [[ "$WIN7_LOCALE" =~ ^[[:alpha:]]{2,3}-[[:alpha:]]{2,4}$ ]] || {
             echo "WIN7_LOCALE must use a language-region form such as en-US or zh-CN."
+            exit 2
+          }
+          [[ "$QEMU_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || {
+            echo "QEMU_TIMEOUT_SECONDS must be a positive integer."
             exit 2
           }
 
@@ -272,7 +286,7 @@ jobs:
             "${{ steps.media.outputs.unattend_image }}" \
             "${{ steps.media.outputs.results_image }}" \
             "${{ steps.media.outputs.work_dir }}" \
-            5400
+            "$QEMU_TIMEOUT_SECONDS"
 
       - name: Extract and validate guest evidence
         id: collect
