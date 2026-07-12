@@ -25,7 +25,10 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
     exit 64
 }
 
-for required_file in api-ms-win-core-sysinfo-l1-2-0.dll pyfcstm.exe smt-verify.fcstm build-metadata.txt; do
+for required_file in \
+    api-ms-win-core-kernel32-legacy-l1-1-1.dll \
+    api-ms-win-core-sysinfo-l1-2-0.dll \
+    pyfcstm.exe smt-verify.fcstm build-metadata.txt; do
     [[ -f "$payload_directory/$required_file" ]] || {
         echo "payload is missing $required_file" >&2
         exit 66
@@ -45,7 +48,9 @@ sed \
 cp "$repository_root/guest/run-ci.cmd" "$staging_directory/run-ci.cmd"
 cp "$repository_root/guest/install-hook.cmd" "$staging_directory/install-hook.cmd"
 cp "$repository_root/guest/verify-cli.cmd" "$staging_directory/verify-cli.cmd"
-cp "$payload_directory/api-ms-win-core-sysinfo-l1-2-0.dll" "$staging_directory/api-ms-win-core-sysinfo-l1-2-0.dll"
+for shim in "$payload_directory"/api-ms-win-core-*.dll; do
+    cp "$shim" "$staging_directory/"
+done
 cp "$payload_directory/pyfcstm.exe" "$staging_directory/pyfcstm.exe"
 cp "$payload_directory/smt-verify.fcstm" "$staging_directory/smt-verify.fcstm"
 cp "$payload_directory/build-metadata.txt" "$staging_directory/build-metadata.txt"

@@ -1,0 +1,16 @@
+LIBRARY api-ms-win-core-kernel32-legacy-l1-1-1.dll
+EXPORTS
+    FindFirstVolumeMountPointW=KERNEL32.FindFirstVolumeMountPointW
+    FindNextVolumeMountPointW=KERNEL32.FindNextVolumeMountPointW
+    FindVolumeMountPointClose=KERNEL32.FindVolumeMountPointClose
+    GetFileAttributesTransactedW=KERNEL32.GetFileAttributesTransactedW
+    GetFirmwareType=KERNEL32.GetFirmwareType
+    GetNumaAvailableMemoryNodeEx=KERNEL32.GetNumaAvailableMemoryNodeEx
+    GetNumaNodeProcessorMask=KERNEL32.GetNumaNodeProcessorMask
+    GetNumaProcessorNodeEx=KERNEL32.GetNumaProcessorNodeEx
+    PowerClearRequest=KERNEL32.PowerClearRequest
+    PowerCreateRequest=KERNEL32.PowerCreateRequest
+    PowerSetRequest=KERNEL32.PowerSetRequest
+    SetDllDirectoryW=KERNEL32.SetDllDirectoryW
+    SetVolumeMountPointW=KERNEL32.SetVolumeMountPointW
+    VerifyVersionInfoW=KERNEL32.VerifyVersionInfoW

@@ -125,15 +125,15 @@ jobs:
           }
           $shimDirectory = Join-Path $env:GITHUB_WORKSPACE 'build-api-set-shim'
           New-Item -ItemType Directory -Force -Path $shimDirectory | Out-Null
-          $shim = Join-Path $shimDirectory 'api-ms-win-core-sysinfo-l1-2-0.dll'
-          & $link /DLL /NOENTRY /MACHINE:X64 `
-            "/DEF:$env:GITHUB_WORKSPACE\guest\api-ms-win-core-sysinfo-l1-2-0.def" `
-            "/OUT:$shim"
-          if ($LASTEXITCODE -ne 0) {
-            throw "link.exe failed with exit code $LASTEXITCODE."
-          }
-          if (-not (Test-Path -Path $shim -PathType Leaf)) {
-            throw 'The Windows 7 API-set shim was not created.'
+          Get-ChildItem "$env:GITHUB_WORKSPACE\guest\*.def" | ForEach-Object {
+            $shim = Join-Path $shimDirectory "$($_.BaseName).dll"
+            & $link /DLL /NOENTRY /MACHINE:X64 "/DEF:$($_.FullName)" "/OUT:$shim"
+            if ($LASTEXITCODE -ne 0) {
+              throw "link.exe failed with exit code $LASTEXITCODE for $($_.Name)."
+            }
+            if (-not (Test-Path -Path $shim -PathType Leaf)) {
+              throw "The Windows 7 API-set shim was not created for $($_.Name)."
+            }
           }
 
       - name: Build Windows 7-compatible standalone CLI from pyfcstm main
@@ -168,8 +168,9 @@ jobs:
           payload_dir="$GITHUB_WORKSPACE/build-payload"
           mkdir -p "$payload_dir"
           cp "$source_dir/dist/pyfcstm.exe" "$payload_dir/pyfcstm.exe"
-          cp "$GITHUB_WORKSPACE/build-api-set-shim/api-ms-win-core-sysinfo-l1-2-0.dll" \
-            "$payload_dir/api-ms-win-core-sysinfo-l1-2-0.dll"
+          for shim in "$GITHUB_WORKSPACE"/build-api-set-shim/*.dll; do
+            cp "$shim" "$payload_dir/"
+          done
           cp "$source_dir/docs/source/tutorials/simulation/example6_transition_priority.full.fcstm" \
             "$payload_dir/smt-verify.fcstm"
           exe_sha256="$(python -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest().upper())' "$payload_dir/pyfcstm.exe")"
