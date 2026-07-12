@@ -232,9 +232,11 @@ jobs:
             echo "Downloaded ISO SHA-256 did not match WIN7_ISO_SHA256."
             exit 1
           }
+          echo "ISO SHA-256 verified."
           inspection_dir="$work_dir/iso-inspection"
           mkdir -p "$inspection_dir"
-          7z e -y "-o$inspection_dir" "$install_iso" sources/install.wim >/dev/null
+          df -h "$work_dir"
+          7z e -y "-o$inspection_dir" "$install_iso" sources/install.wim
           image_info="$work_dir/install-image-info.txt"
           wimlib-imagex info "$inspection_dir/install.wim" "$WIN7_IMAGE_INDEX" > "$image_info"
           grep -E '^Name:.*Windows 7' "$image_info" >/dev/null
