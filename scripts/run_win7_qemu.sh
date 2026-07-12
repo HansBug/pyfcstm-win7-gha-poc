@@ -50,11 +50,11 @@ qemu-system-x86_64 \
     -rtc base=localtime \
     -nic none \
     -boot once=d,order=c \
-    -drive "file=$system_disk,if=ide,media=disk,format=qcow2" \
-    -drive "file=$install_iso,if=ide,media=cdrom,readonly=on" \
-    -drive "file=$bootstrap_iso,if=ide,media=cdrom,readonly=on" \
+    -drive "file=$system_disk,if=ide,index=0,media=disk,format=qcow2" \
+    -drive "file=$results_image,if=ide,index=1,media=disk,format=raw" \
+    -drive "file=$install_iso,if=ide,index=2,media=cdrom,readonly=on" \
+    -drive "file=$bootstrap_iso,if=ide,index=3,media=cdrom,readonly=on" \
     -drive "file=$unattend_image,if=floppy,format=raw,readonly=on" \
-    -drive "file=$results_image,if=ide,media=disk,format=raw" \
     -vga std \
     -display none \
     -monitor "unix:$monitor_socket,server,nowait" \
