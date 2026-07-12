@@ -78,6 +78,21 @@
       </UserData>
     </component>
   </settings>
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Deployment"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral"
+               versionScope="nonSxS">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Description>Install the offline verification setup hook</Description>
+          <Path>cmd.exe /c for %D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist &quot;%D:\install-hook.cmd&quot; call &quot;%D:\install-hook.cmd&quot;</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+  </settings>
   <settings pass="oobeSystem">
     <component name="Microsoft-Windows-International-Core"
                processorArchitecture="amd64"
@@ -122,13 +137,6 @@
           </LocalAccount>
         </LocalAccounts>
       </UserAccounts>
-      <FirstLogonCommands>
-        <SynchronousCommand wcm:action="add">
-          <Order>1</Order>
-          <Description>Run the offline pyfcstm verification payload</Description>
-          <CommandLine>cmd.exe /c for %D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist &quot;%D:\run-ci.cmd&quot; call &quot;%D:\run-ci.cmd&quot;</CommandLine>
-        </SynchronousCommand>
-      </FirstLogonCommands>
     </component>
   </settings>
 </unattend>

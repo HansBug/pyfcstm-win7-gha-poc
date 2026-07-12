@@ -18,9 +18,9 @@ The workflow uses only GitHub-hosted runners:
    Windows 7 virtual disk for this run.
 3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
    The guest has no virtual NIC.
-4. Windows Setup reads `Autounattend.xml`, installs unattended, auto-logs in
-   once, runs the EXE from an offline payload CD, writes evidence to a FAT
-   result disk, and shuts down.
+4. Windows Setup reads `Autounattend.xml`, installs unattended, registers its
+   `SetupComplete.cmd` hook from an offline payload CD, runs the EXE, writes
+   evidence to a FAT result disk, and shuts down before interactive login.
 5. The Linux host accepts a run only when the returned caption names Windows 7
    and the returned values are exactly `Version=6.1.7601`, `BuildNumber=7601`,
    `ServicePackMajorVersion=1`, `ProductType=1`, and `OSArchitecture=64-bit`.

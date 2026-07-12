@@ -43,6 +43,7 @@ sed \
     -e "s/__WIN7_LOCALE__/$locale/g" \
     "$repository_root/guest/Autounattend.xml" > "$staging_directory/Autounattend.xml"
 cp "$repository_root/guest/run-ci.cmd" "$staging_directory/run-ci.cmd"
+cp "$repository_root/guest/install-hook.cmd" "$staging_directory/install-hook.cmd"
 cp "$repository_root/guest/verify-cli.cmd" "$staging_directory/verify-cli.cmd"
 cp "$payload_directory/pyfcstm.exe" "$staging_directory/pyfcstm.exe"
 cp "$payload_directory/smt-verify.fcstm" "$staging_directory/smt-verify.fcstm"
