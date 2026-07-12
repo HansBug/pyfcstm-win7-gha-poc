@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 5 ]]; then
-    echo "usage: $0 INSTALL_ISO BOOTSTRAP_ISO RESULTS_IMAGE WORK_DIRECTORY TIMEOUT_SECONDS" >&2
+if [[ $# -ne 6 ]]; then
+    echo "usage: $0 INSTALL_ISO BOOTSTRAP_ISO UNATTEND_IMAGE RESULTS_IMAGE WORK_DIRECTORY TIMEOUT_SECONDS" >&2
     exit 64
 fi
 
 install_iso=$1
 bootstrap_iso=$2
-results_image=$3
-work_directory=$4
-timeout_seconds=$5
+unattend_image=$3
+results_image=$4
+work_directory=$5
+timeout_seconds=$6
 
-for required_file in "$install_iso" "$bootstrap_iso" "$results_image"; do
+for required_file in "$install_iso" "$bootstrap_iso" "$unattend_image" "$results_image"; do
     [[ -f "$required_file" ]] || {
         echo "required image does not exist: $required_file" >&2
         exit 66
@@ -45,6 +46,7 @@ timeout --foreground "$timeout_seconds" qemu-system-x86_64 \
     -drive "file=$system_disk,if=ide,media=disk,format=qcow2" \
     -drive "file=$install_iso,if=ide,media=cdrom,readonly=on" \
     -drive "file=$bootstrap_iso,if=ide,media=cdrom,readonly=on" \
+    -drive "file=$unattend_image,if=floppy,format=raw,readonly=on" \
     -drive "file=$results_image,if=ide,media=disk,format=raw" \
     -vga std \
     -display none \
