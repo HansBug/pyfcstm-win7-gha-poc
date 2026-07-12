@@ -197,7 +197,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            ca-certificates curl dosfstools mtools p7zip-full qemu-system-x86 qemu-utils wimtools xorriso
+            ca-certificates curl dosfstools mtools netcat-openbsd p7zip-full qemu-system-x86 qemu-utils wimtools xorriso
 
       - name: Require KVM on the GitHub-hosted runner
         shell: bash
@@ -292,6 +292,7 @@ jobs:
           name: win7-verification-evidence
           path: |
             ${{ runner.temp }}/win7-poc/serial.log
+            ${{ runner.temp }}/win7-poc/qemu-screen.ppm
             ${{ runner.temp }}/win7-poc/win7-results.img
             ${{ steps.media.outputs.image_info }}
             guest-evidence
