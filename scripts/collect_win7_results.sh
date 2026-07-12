@@ -21,16 +21,18 @@ output_directory=$3
 
 rm -rf "$output_directory"
 mkdir -p "$output_directory"
-for evidence_file in result.txt os.txt hash.txt verify-cli.log; do
+for evidence_file in result.txt failure.txt os.txt hash.txt verify-cli.log; do
     mcopy -o -i "$results_image" "::$evidence_file" "$output_directory/$evidence_file"
     sed -i 's/\r$//' "$output_directory/$evidence_file"
 done
 
 grep -Fx 'PASS' "$output_directory/result.txt" >/dev/null
+grep -E '^Caption=.*Windows 7' "$output_directory/os.txt" >/dev/null
 grep -Fx 'Version=6.1.7601' "$output_directory/os.txt" >/dev/null
 grep -Fx 'BuildNumber=7601' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ServicePackMajorVersion=1' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ProductType=1' "$output_directory/os.txt" >/dev/null
+grep -Fx 'OSArchitecture=64-bit' "$output_directory/os.txt" >/dev/null
 
 actual_exe_sha256=$(grep -Eio '[A-F0-9]{64}' "$output_directory/hash.txt" | head -n 1 | tr '[:lower:]' '[:upper:]')
 [[ "$actual_exe_sha256" == "$expected_exe_sha256" ]] || {

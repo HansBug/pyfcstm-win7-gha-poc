@@ -19,13 +19,16 @@ The workflow uses only GitHub-hosted runners:
 4. Windows Setup reads `Autounattend.xml`, installs unattended, auto-logs in
    once, runs the EXE from an offline payload CD, writes evidence to a FAT
    result disk, and shuts down.
-5. The Linux host accepts a run only when the returned values are exactly
-   `Version=6.1.7601`, `BuildNumber=7601`, `ServicePackMajorVersion=1`, and
-   `ProductType=1`, the guest's SHA-256 equals the Windows build artifact, and
-   the CLI smoke, PlantUML, and SMT/Z3 inspect commands succeeded.
+5. The Linux host accepts a run only when the returned caption names Windows 7
+   and the returned values are exactly `Version=6.1.7601`, `BuildNumber=7601`,
+   `ServicePackMajorVersion=1`, `ProductType=1`, and `OSArchitecture=64-bit`.
+   The guest's SHA-256 must equal the Windows build artifact, and the CLI
+   smoke, PlantUML, and SMT/Z3 inspect commands must succeed.
 
 `ProductType=1` is essential: it rejects Windows Server 2008 R2, which shares
-the 6.1 kernel family but is not Windows 7.
+the 6.1 kernel family but is not Windows 7. Requiring a Windows 7 caption also
+prevents a componentized Embedded Standard 7 image from being labelled as a
+Windows 7 client result.
 
 Until a successful run has produced `win7-verification-evidence`, this
 repository must not describe any pyfcstm executable as "Verified on Win7".

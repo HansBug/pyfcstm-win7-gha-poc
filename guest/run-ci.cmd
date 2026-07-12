@@ -40,10 +40,12 @@ set "FAILURE="
 > "%RESULT_DRIVE%\result.txt" echo %STATUS%
 > "%RESULT_DRIVE%\failure.txt" echo %FAILURE%
 > "%RESULT_DRIVE%\os.txt" (
+    wmic os get Caption /value
     wmic os get Version /value
     wmic os get BuildNumber /value
     wmic os get ServicePackMajorVersion /value
     wmic os get ProductType /value
+    wmic os get OSArchitecture /value
 )
 certutil -hashfile "%RUN_DIRECTORY%\pyfcstm.exe" SHA256 > "%RESULT_DRIVE%\hash.txt" 2>&1
 copy /Y "%RUN_DIRECTORY%\verify-cli.log" "%RESULT_DRIVE%\verify-cli.log" >nul 2>&1
