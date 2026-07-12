@@ -9,6 +9,7 @@ fi
 results_image=$1
 expected_exe_sha256=${2^^}
 output_directory=$3
+results_volume="${results_image}@@1048576"
 
 [[ -f "$results_image" ]] || {
     echo "results image does not exist: $results_image" >&2
@@ -22,11 +23,11 @@ output_directory=$3
 rm -rf "$output_directory"
 mkdir -p "$output_directory"
 for evidence_file in result.txt failure.txt os.txt hash.txt verify-cli.log; do
-    mcopy -o -i "$results_image" "::$evidence_file" "$output_directory/$evidence_file"
+    mcopy -o -i "$results_volume" "::$evidence_file" "$output_directory/$evidence_file"
     sed -i 's/\r$//' "$output_directory/$evidence_file"
 done
 
-if mcopy -o -i "$results_image" ::run-ci-started.txt "$output_directory/run-ci-started.txt"; then
+if mcopy -o -i "$results_volume" ::run-ci-started.txt "$output_directory/run-ci-started.txt"; then
     sed -i 's/\r$//' "$output_directory/run-ci-started.txt"
 fi
 

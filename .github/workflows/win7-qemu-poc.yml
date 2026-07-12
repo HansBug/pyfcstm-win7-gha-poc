@@ -299,8 +299,7 @@ jobs:
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
           bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
           bash scripts/build_unattend_floppy.sh "$work_dir/unattend.img" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
-          truncate -s 64M "$work_dir/win7-results.img"
-          mkfs.fat -F 32 -n PYFCSTMRES "$work_dir/win7-results.img"
+          bash scripts/build_results_image.sh "$work_dir/win7-results.img"
 
           printf 'install_iso=%s\n' "$install_iso" >> "$GITHUB_OUTPUT"
           printf 'bootstrap_iso=%s\n' "$work_dir/bootstrap.iso" >> "$GITHUB_OUTPUT"
