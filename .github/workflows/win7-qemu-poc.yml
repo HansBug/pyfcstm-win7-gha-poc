@@ -40,6 +40,7 @@ jobs:
       WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
       WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
       WIN7_LOCALE: ${{ inputs.win7_locale || vars.WIN7_LOCALE || 'en-US' }}
+      WIN7_ISO_FALLBACK_URLS: ${{ vars.WIN7_ISO_FALLBACK_URLS }}
     steps:
       - name: Validate the licensed installation-media configuration
         shell: bash
@@ -158,6 +159,7 @@ jobs:
       WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
       WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
       WIN7_LOCALE: ${{ inputs.win7_locale || vars.WIN7_LOCALE || 'en-US' }}
+      WIN7_ISO_FALLBACK_URLS: ${{ vars.WIN7_ISO_FALLBACK_URLS }}
     steps:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
@@ -195,7 +197,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            ca-certificates curl dosfstools mtools qemu-system-x86 qemu-utils xorriso
+            ca-certificates curl dosfstools mtools p7zip-full qemu-system-x86 qemu-utils wimtools xorriso
 
       - name: Require KVM on the GitHub-hosted runner
         shell: bash
@@ -221,8 +223,17 @@ jobs:
           work_dir="$RUNNER_TEMP/win7-poc"
           mkdir -p "$work_dir"
           install_iso="$work_dir/windows-7.iso"
-          bash scripts/download_with_ranges.sh "$WIN7_ISO_URL" "$install_iso"
+          DOWNLOAD_FALLBACK_URLS="$WIN7_ISO_FALLBACK_URLS" \
+            bash scripts/download_with_ranges.sh "$WIN7_ISO_URL" "$install_iso"
           printf '%s  %s\n' "$WIN7_ISO_SHA256" "$install_iso" | sha256sum --check --status -
+          inspection_dir="$work_dir/iso-inspection"
+          mkdir -p "$inspection_dir"
+          7z e -y "-o$inspection_dir" "$install_iso" sources/install.wim >/dev/null
+          image_info="$work_dir/install-image-info.txt"
+          wimlib-imagex info "$inspection_dir/install.wim" "$WIN7_IMAGE_INDEX" > "$image_info"
+          grep -E '^Name:.*Windows 7' "$image_info" >/dev/null
+          grep -E '^Architecture: x86_64' "$image_info" >/dev/null
+          rm -rf "$inspection_dir"
 
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
           bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
@@ -233,6 +244,7 @@ jobs:
           printf 'bootstrap_iso=%s\n' "$work_dir/bootstrap.iso" >> "$GITHUB_OUTPUT"
           printf 'results_image=%s\n' "$work_dir/win7-results.img" >> "$GITHUB_OUTPUT"
           printf 'work_dir=%s\n' "$work_dir" >> "$GITHUB_OUTPUT"
+          printf 'image_info=%s\n' "$image_info" >> "$GITHUB_OUTPUT"
           printf 'exe_sha256=%s\n' "$expected_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Install Windows 7 SP1 and run the candidate executable
@@ -266,6 +278,7 @@ jobs:
           path: |
             ${{ runner.temp }}/win7-poc/serial.log
             ${{ runner.temp }}/win7-poc/win7-results.img
+            ${{ steps.media.outputs.image_info }}
             guest-evidence
           retention-days: 30
           if-no-files-found: warn
