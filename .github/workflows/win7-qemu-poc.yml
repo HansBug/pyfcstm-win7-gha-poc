@@ -129,7 +129,7 @@ jobs:
           $msvcp = $visualStudioRoots |
             ForEach-Object { Get-ChildItem -Path $_ -Filter msvcp140.dll -File -Recurse } |
             Where-Object {
-              $_.FullName -match '\\VC\\Redist\\MSVC\\.+\\x64\\Microsoft\.VC\\d+\.CRT\\msvcp140\.dll$'
+              $_.FullName -match '\\VC\\Redist\\MSVC\\.+\\x64\\Microsoft\.VC\d+\.CRT\\msvcp140\.dll$'
             } |
             Select-Object -First 1
           if (-not $msvcp) {
