@@ -1,0 +1,7 @@
+# QEMU and extracted guest evidence are intentionally local-only.
+*.iso
+*.img
+*.qcow2
+serial.log
+guest-evidence/
+build-payload/

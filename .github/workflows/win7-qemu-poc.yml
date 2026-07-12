@@ -1,0 +1,262 @@
+name: Verify pyfcstm CLI on Windows 7 SP1
+
+on:
+  workflow_dispatch:
+    inputs:
+      win7_iso_url:
+        description: Optional replacement for the WIN7_ISO_URL repository secret.
+        required: false
+        type: string
+      win7_iso_sha256:
+        description: Optional replacement for the WIN7_ISO_SHA256 repository secret.
+        required: false
+        type: string
+      win7_image_index:
+        description: Optional replacement for the WIN7_IMAGE_INDEX repository variable.
+        required: false
+        type: string
+  repository_dispatch:
+    types: [verify-pyfcstm-main]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: win7-qemu-validation
+  cancel-in-progress: false
+
+jobs:
+  validate-licensed-media:
+    name: Validate Windows 7 media configuration
+    runs-on: ubuntu-24.04
+    env:
+      WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
+      WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
+      WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
+    steps:
+      - name: Validate the licensed installation-media configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$WIN7_ISO_URL" || {
+            echo "WIN7_ISO_URL must be supplied as a repository secret or dispatch input."
+            exit 2
+          }
+          [[ "$WIN7_ISO_SHA256" =~ ^[[:xdigit:]]{64}$ ]] || {
+            echo "WIN7_ISO_SHA256 must be a 64-character SHA-256 digest."
+            exit 2
+          }
+          [[ "$WIN7_IMAGE_INDEX" =~ ^[1-9][0-9]*$ ]] || {
+            echo "WIN7_IMAGE_INDEX must be a positive install.wim image index."
+            exit 2
+          }
+
+  build-pyfcstm-main:
+    name: Build pyfcstm main on Windows 2022
+    needs: validate-licensed-media
+    runs-on: windows-2022
+    outputs:
+      pyfcstm_commit: ${{ steps.metadata.outputs.pyfcstm_commit }}
+    steps:
+      - name: Checkout PoC orchestration only
+        uses: actions/checkout@v4
+
+      - name: Checkout pyfcstm main for this build
+        uses: actions/checkout@v4
+        with:
+          repository: HansBug/pyfcstm
+          ref: main
+          path: _source/pyfcstm
+          fetch-depth: 1
+
+      - name: Install Windows build tools
+        shell: bash
+        run: choco install make zip --no-progress --yes
+
+      - name: Install Cairo runtime
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-cairo
+
+      - name: Expose Cairo runtime
+        shell: bash
+        run: echo "${{ steps.msys2.outputs.msys2-location }}\\mingw64\\bin" >> "$GITHUB_PATH"
+
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.7"
+
+      - name: Build standalone CLI from pyfcstm main
+        shell: bash
+        env:
+          IS_WIN: "1"
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/_source/pyfcstm"
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-build.txt
+          make build
+          test -f dist/pyfcstm.exe
+          ./dist/pyfcstm.exe -v
+          ./dist/pyfcstm.exe -h
+
+      - name: Create a minimal guest payload
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$GITHUB_WORKSPACE/_source/pyfcstm"
+          payload_dir="$GITHUB_WORKSPACE/build-payload"
+          mkdir -p "$payload_dir"
+          cp "$source_dir/dist/pyfcstm.exe" "$payload_dir/pyfcstm.exe"
+          cp "$source_dir/docs/source/tutorials/simulation/example6_transition_priority.full.fcstm" \
+            "$payload_dir/smt-verify.fcstm"
+          exe_sha256="$(python -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest().upper())' "$payload_dir/pyfcstm.exe")"
+          pyinstaller_version="$(python -c 'import PyInstaller; print(PyInstaller.__version__)')"
+          pyfcstm_commit="$(git -C "$source_dir" rev-parse HEAD)"
+          {
+            printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit"
+            printf 'pyinstaller_version=%s\n' "$pyinstaller_version"
+            printf 'python_version=%s\n' "$(python --version)"
+            printf 'pyfcstm_exe_sha256=%s\n' "$exe_sha256"
+          } > "$payload_dir/build-metadata.txt"
+          printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Upload only the executable and test payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyfcstm-win7-payload
+          path: build-payload
+          retention-days: 14
+          if-no-files-found: error
+
+  verify-on-win7:
+    name: Boot Windows 7 SP1 and execute the built CLI
+    needs: [validate-licensed-media, build-pyfcstm-main]
+    runs-on: ubuntu-24.04
+    env:
+      WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
+      WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
+      WIN7_IMAGE_INDEX: ${{ inputs.win7_image_index || vars.WIN7_IMAGE_INDEX || '1' }}
+    steps:
+      - name: Checkout PoC orchestration only
+        uses: actions/checkout@v4
+
+      - name: Download the executable built in the preceding job
+        uses: actions/download-artifact@v4
+        with:
+          name: pyfcstm-win7-payload
+          path: build-payload
+
+      - name: Validate the licensed installation-media configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$WIN7_ISO_URL" || {
+            echo "WIN7_ISO_URL must be supplied as a repository secret or dispatch input."
+            exit 2
+          }
+          [[ "$WIN7_ISO_SHA256" =~ ^[[:xdigit:]]{64}$ ]] || {
+            echo "WIN7_ISO_SHA256 must be a 64-character SHA-256 digest."
+            exit 2
+          }
+          [[ "$WIN7_IMAGE_INDEX" =~ ^[1-9][0-9]*$ ]] || {
+            echo "WIN7_IMAGE_INDEX must be a positive install.wim image index."
+            exit 2
+          }
+
+      - name: Install QEMU and FAT-image tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            ca-certificates curl dosfstools mtools qemu-system-x86 qemu-utils xorriso
+
+      - name: Require KVM on the GitHub-hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -e /dev/kvm || {
+            echo "The selected GitHub-hosted runner does not expose /dev/kvm."
+            exit 1
+          }
+          if ! test -r /dev/kvm || ! test -w /dev/kvm; then
+            sudo chmod 0666 /dev/kvm
+          fi
+          test -r /dev/kvm
+          test -w /dev/kvm
+          ls -l /dev/kvm
+          qemu-system-x86_64 --version
+
+      - name: Download and verify the licensed Windows 7 ISO
+        id: media
+        shell: bash
+        run: |
+          set -euo pipefail
+          work_dir="$RUNNER_TEMP/win7-poc"
+          mkdir -p "$work_dir"
+          install_iso="$work_dir/windows-7.iso"
+          curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
+            --output "$install_iso" "$WIN7_ISO_URL"
+          printf '%s  %s\n' "$WIN7_ISO_SHA256" "$install_iso" | sha256sum --check --status -
+
+          expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
+          bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX"
+          truncate -s 64M "$work_dir/win7-results.img"
+          mkfs.fat -F 32 -n PYFCSTMRESULTS "$work_dir/win7-results.img"
+
+          printf 'install_iso=%s\n' "$install_iso" >> "$GITHUB_OUTPUT"
+          printf 'bootstrap_iso=%s\n' "$work_dir/bootstrap.iso" >> "$GITHUB_OUTPUT"
+          printf 'results_image=%s\n' "$work_dir/win7-results.img" >> "$GITHUB_OUTPUT"
+          printf 'work_dir=%s\n' "$work_dir" >> "$GITHUB_OUTPUT"
+          printf 'exe_sha256=%s\n' "$expected_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Install Windows 7 SP1 and run the candidate executable
+        id: qemu
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash scripts/run_win7_qemu.sh \
+            "${{ steps.media.outputs.install_iso }}" \
+            "${{ steps.media.outputs.bootstrap_iso }}" \
+            "${{ steps.media.outputs.results_image }}" \
+            "${{ steps.media.outputs.work_dir }}" \
+            5400
+
+      - name: Extract and validate guest evidence
+        id: collect
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash scripts/collect_win7_results.sh \
+            "${{ steps.media.outputs.results_image }}" \
+            "${{ steps.media.outputs.exe_sha256 }}" \
+            guest-evidence
+
+      - name: Upload non-redistributable verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: win7-verification-evidence
+          path: |
+            ${{ runner.temp }}/win7-poc/serial.log
+            ${{ runner.temp }}/win7-poc/win7-results.img
+            guest-evidence
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Fail unless QEMU and guest evidence both passed
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.qemu.outcome }}" = success
+          test "${{ steps.collect.outcome }}" = success
