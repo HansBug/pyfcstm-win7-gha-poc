@@ -26,6 +26,10 @@ for evidence_file in result.txt failure.txt os.txt hash.txt verify-cli.log; do
     sed -i 's/\r$//' "$output_directory/$evidence_file"
 done
 
+if mcopy -o -i "$results_image" ::run-ci-started.txt "$output_directory/run-ci-started.txt"; then
+    sed -i 's/\r$//' "$output_directory/run-ci-started.txt"
+fi
+
 grep -Fx 'PASS' "$output_directory/result.txt" >/dev/null
 grep -E '^Caption=.*Windows 7' "$output_directory/os.txt" >/dev/null
 grep -Fx 'Version=6.1.7601' "$output_directory/os.txt" >/dev/null

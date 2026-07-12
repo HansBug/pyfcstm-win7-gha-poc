@@ -1,9 +1,9 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 
-set "RUN_DIRECTORY=%USERPROFILE%\pyfcstm-win7-poc"
+set "RUN_DIRECTORY=%SystemDrive%\pyfcstm-win7-poc"
 set "PAYLOAD_DRIVE="
-set "RESULT_DRIVE="
+set "RESULT_DRIVE=D:"
 set "STATUS=FAIL"
 set "FAILURE=unknown"
 
@@ -15,7 +15,9 @@ for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
 ping 127.0.0.1 -n 6 >nul
 for /f "tokens=2 delims==" %%D in ('wmic logicaldisk where "VolumeName='PYFCSTMRES'" get DeviceID /value ^| find "="') do set "RESULT_DRIVE=%%D"
 
+if not exist "%RESULT_DRIVE%\" set "RESULT_DRIVE="
 if not defined RESULT_DRIVE goto :shutdown
+> "%RESULT_DRIVE%\run-ci-started.txt" echo started
 if not defined PAYLOAD_DRIVE (
     set "FAILURE=bootstrap payload CD was not found"
     goto :finish
