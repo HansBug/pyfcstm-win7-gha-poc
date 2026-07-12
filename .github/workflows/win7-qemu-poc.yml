@@ -166,7 +166,7 @@ jobs:
 
           ucrt_entries = list(walk_toc(toc))
           assert len(ucrt_entries) == 1, ucrt_entries
-          ucrt_source = ucrt_entries[0][1].replace("\\\\", "/").lower()
+          ucrt_source = ucrt_entries[0][1].replace("\\", "/").lower()
           print("UCRT source:", ucrt_source)
           assert "/windows kits/10/redist/" in ucrt_source, ucrt_source
           assert ucrt_source.endswith("/ucrt/dlls/x64/ucrtbase.dll"), ucrt_source
