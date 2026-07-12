@@ -16,8 +16,11 @@ The workflow uses only GitHub-hosted runners:
    while PyInstaller 5 and later list Windows 8 as the support floor.
    The packaged app-local Universal CRT contains `ucrtbase.dll`,
    `vcruntime140.dll`, and the required `api-ms-win-*.dll` API-set forwarders
-   from the Windows SDK Redist directory. This follows Microsoft's legacy
-   Windows deployment guidance for the Universal CRT.
+   from the Windows SDK Redist directory. It also bundles a required
+   `MSVCP140.dll` from the hosted runner's Visual C++ Redist directory. This
+   follows Microsoft's documented app-local deployment model for legacy
+   Windows, while acknowledging that central Redist installation is preferred
+   for normal end-user deployments.
    The workflow rebuilds PyInstaller's binary cache with the x64 UCRT from the
    hosted runner's Windows SDK `Redist` directory, then asserts that the
    generated `PKG-00.toc` selected that redistributable for both
