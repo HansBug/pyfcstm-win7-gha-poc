@@ -20,11 +20,11 @@ The workflow uses only GitHub-hosted runners:
    otherwise archive them; they are OS forwarders and fail to load on a clean
    Windows 7 guest. Universal CRT files (`api-ms-win-crt-*`, `ucrtbase.dll`,
    and `vcruntime140.dll`) remain bundled.
-   The workflow also uses the hosted runner's Microsoft linker to generate the
-   x64, source-controlled API-set forwarding shims that the hosted Python
-   3.7/PyInstaller executable imports but Windows 7 lacks. The shims are
-   created per run and copied beside the EXE; no binary shim is stored in this
-   repository.
+   The workflow rebuilds PyInstaller's binary cache with the x64 UCRT from the
+   hosted runner's Windows SDK `Redist` directory, then asserts that the
+   generated `PKG-00.toc` selected that redistributable rather than Windows
+   10's system `ucrtbase.dll`. This keeps the Windows 7 UCRT distribution in
+   the one-file executable without storing a runtime DLL in this repository.
 2. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
    Windows 7 virtual disk for this run.
 3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
