@@ -54,10 +54,12 @@ is useful for testing a new authorized ISO without changing saved settings.
 The ISO is downloaded to the ephemeral runner, checked before use, never
 cached, and not uploaded as an artifact.
 
-Windows 7 media licensing is not solved by technical automation. Use only
-media and a license whose terms permit this use. In particular, do not source
-an ISO from a third-party re-distribution, archive, or modified image. Each
-run creates a fresh unactivated guest and destroys its disk, rather than
+Windows 7 media licensing is not solved by technical automation. A public
+download URL is an availability mechanism, not a license grant: the repository
+owner remains responsible for ensuring that use of the selected media is
+authorized. The workflow verifies the exact configured SHA-256 before it uses
+the ISO, then checks the selected ``install.wim`` image is Windows 7 x64.
+Each run creates a fresh unactivated guest and destroys its disk, rather than
 persisting an activated golden image.
 
 ## Automation and evidence
