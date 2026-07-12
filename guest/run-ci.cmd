@@ -13,7 +13,7 @@ for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
 )
 
 ping 127.0.0.1 -n 6 >nul
-for /f "tokens=2 delims==" %%D in ('wmic logicaldisk where "VolumeName='PYFCSTMRESULTS'" get DeviceID /value ^| find "="') do set "RESULT_DRIVE=%%D"
+for /f "tokens=2 delims==" %%D in ('wmic logicaldisk where "VolumeName='PYFCSTMRES'" get DeviceID /value ^| find "="') do set "RESULT_DRIVE=%%D"
 
 if not defined RESULT_DRIVE goto :shutdown
 if not defined PAYLOAD_DRIVE (
