@@ -141,10 +141,9 @@ jobs:
           python -c 'import PyInstaller; assert PyInstaller.__version__ == "4.10"'
           make tpl app_icons
           python -m tools.generate_spec -o pyfcstm.spec --icon-dir build/icons
-          python "$GITHUB_WORKSPACE/scripts/filter_win7_api_set_binaries.py" pyfcstm.spec
           pyinstaller pyfcstm.spec
           pyi-archive_viewer -l dist/pyfcstm.exe > build/pyi-archive.txt
-          ! grep -i 'api-ms-win-core-' build/pyi-archive.txt
+          grep -qi 'api-ms-win-core-localization-l1-2-0.dll' build/pyi-archive.txt
           grep -q 'pyfcstm.png' build/pyi-archive.txt
           python - <<'PY'
           import ast
@@ -155,21 +154,25 @@ jobs:
           def walk_toc(item):
               if (
                   isinstance(item, tuple)
-                  and item
+                  and len(item) >= 2
                   and isinstance(item[0], str)
-                  and item[0].lower() == "ucrtbase.dll"
+                  and isinstance(item[1], str)
               ):
                   yield item
               if isinstance(item, (list, tuple)):
                   for child in item:
                       yield from walk_toc(child)
 
-          ucrt_entries = list(walk_toc(toc))
-          assert len(ucrt_entries) == 1, ucrt_entries
-          ucrt_source = ucrt_entries[0][1].replace("\\", "/").lower()
-          print("UCRT source:", ucrt_source)
-          assert "/windows kits/10/redist/" in ucrt_source, ucrt_source
-          assert ucrt_source.endswith("/ucrt/dlls/x64/ucrtbase.dll"), ucrt_source
+          def sdk_redist_source(filename):
+              entries = [entry for entry in walk_toc(toc) if entry[0].lower() == filename]
+              assert len(entries) == 1, entries
+              source = entries[0][1].replace("\\", "/").lower()
+              print(f"{filename} source:", source)
+              assert "/windows kits/10/redist/" in source, source
+              assert source.endswith(f"/ucrt/dlls/x64/{filename}"), source
+
+          sdk_redist_source("ucrtbase.dll")
+          sdk_redist_source("api-ms-win-core-localization-l1-2-0.dll")
           PY
           test -f dist/pyfcstm.exe
           ./dist/pyfcstm.exe -v
@@ -188,13 +191,13 @@ jobs:
             "$payload_dir/smt-verify.fcstm"
           exe_sha256="$(python -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest().upper())' "$payload_dir/pyfcstm.exe")"
           pyinstaller_version="$(python -c 'import PyInstaller; print(PyInstaller.__version__)')"
-          api_set_core_dlls="$(grep -ci 'api-ms-win-core-' "$source_dir/build/pyi-archive.txt" || true)"
-          test "$api_set_core_dlls" -eq 0
+          api_set_forwarders="$(grep -ci 'api-ms-win-' "$source_dir/build/pyi-archive.txt" || true)"
+          test "$api_set_forwarders" -gt 0
           pyfcstm_commit="$(git -C "$source_dir" rev-parse HEAD)"
           {
             printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit"
             printf 'pyinstaller_version=%s\n' "$pyinstaller_version"
-            printf 'api_ms_win_core_dlls=%s\n' "$api_set_core_dlls"
+            printf 'api_ms_win_forwarders=%s\n' "$api_set_forwarders"
             printf 'python_version=%s\n' "$(python --version)"
             printf 'pyfcstm_exe_sha256=%s\n' "$exe_sha256"
           } > "$payload_dir/build-metadata.txt"
