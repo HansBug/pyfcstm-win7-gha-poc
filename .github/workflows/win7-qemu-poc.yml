@@ -146,9 +146,10 @@ jobs:
           pyi-archive_viewer -l dist/pyfcstm.exe > build/pyi-archive.txt
           ! grep -i 'api-ms-win-core-' build/pyi-archive.txt
           grep -q 'pyfcstm.png' build/pyi-archive.txt
-          ucrt_toc_line="$(grep -i 'ucrtbase.dll' build/pyfcstm/PKG-00.toc)"
+          ucrt_toc_line="$(grep -i -A 2 "'ucrtbase.dll'" build/pyfcstm/PKG-00.toc)"
           printf 'UCRT source: %s\n' "$ucrt_toc_line"
-          [[ "$ucrt_toc_line" == *"Windows Kits"* && "$ucrt_toc_line" == *"Redist"* ]]
+          [[ "$ucrt_toc_line" == *"Kits\\10\\Redist"* ]]
+          [[ "$ucrt_toc_line" == *"\\ucrt\\DLLs\\x64\\ucrtbase.dll"* ]]
           test -f dist/pyfcstm.exe
           ./dist/pyfcstm.exe -v
           ./dist/pyfcstm.exe -h
