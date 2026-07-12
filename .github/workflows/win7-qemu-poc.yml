@@ -122,8 +122,12 @@ jobs:
           if (-not $ucrt) {
             throw 'Could not locate the x64 UCRT redistributable in the Windows SDK.'
           }
-          $visualStudioRoot = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio'
-          $msvcp = Get-ChildItem -Path $visualStudioRoot -Filter msvcp140.dll -File -Recurse |
+          $visualStudioRoots = @(
+            (Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio'),
+            (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio')
+          ) | Where-Object { Test-Path $_ }
+          $msvcp = $visualStudioRoots |
+            ForEach-Object { Get-ChildItem -Path $_ -Filter msvcp140.dll -File -Recurse } |
             Where-Object {
               $_.FullName -match '\\VC\\Redist\\MSVC\\.+\\x64\\Microsoft\.VC\\d+\.CRT\\msvcp140\.dll$'
             } |
