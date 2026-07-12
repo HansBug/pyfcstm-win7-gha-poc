@@ -13,9 +13,20 @@ for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
 )
 
 ping 127.0.0.1 -n 6 >nul
-for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
-    vol %%D: 2>nul | findstr /I /C:"PYFCSTMRES" >nul
-    if not errorlevel 1 set "RESULT_DRIVE=%%D:"
+set "DISKPART_SCRIPT=%TEMP%\pyfcstm-result-diskpart.txt"
+> "%DISKPART_SCRIPT%" (
+    echo select disk 1
+    echo select partition 1
+    echo assign letter=R
+)
+diskpart /s "%DISKPART_SCRIPT%" >nul 2>&1
+del "%DISKPART_SCRIPT%" >nul 2>&1
+if exist R:\ set "RESULT_DRIVE=R:"
+if not defined RESULT_DRIVE (
+    for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
+        vol %%D: 2>nul | findstr /I /C:"PYFCSTMRES" >nul
+        if not errorlevel 1 set "RESULT_DRIVE=%%D:"
+    )
 )
 if not defined RESULT_DRIVE (
     for /f "tokens=2 delims==" %%D in ('wmic logicaldisk where "VolumeName='PYFCSTMRES'" get DeviceID /value ^| find "="') do set "RESULT_DRIVE=%%D"
