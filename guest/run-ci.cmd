@@ -45,7 +45,6 @@ if not defined PAYLOAD_DRIVE (
 copy /Y "%PAYLOAD_DRIVE%\run-gui-ci.cmd" "%RUN_DIRECTORY%\run-gui-ci.cmd" >nul
 copy /Y "%PAYLOAD_DRIVE%\run-gui-acceptance.ps1" "%RUN_DIRECTORY%\run-gui-acceptance.ps1" >nul
 copy /Y "%PAYLOAD_DRIVE%\capture-desktop.ps1" "%RUN_DIRECTORY%\capture-desktop.ps1" >nul
-copy /Y "%PAYLOAD_DRIVE%\run-gui-task.vbs" "%RUN_DIRECTORY%\run-gui-task.vbs" >nul
 if not exist "%RUN_DIRECTORY%\run-gui-ci.cmd" (
     set "FAILURE=interactive GUI runner copy failed"
     goto :finish
@@ -58,13 +57,8 @@ if not exist "%RUN_DIRECTORY%\capture-desktop.ps1" (
     set "FAILURE=desktop capture script copy failed"
     goto :finish
 )
-if not exist "%RUN_DIRECTORY%\run-gui-task.vbs" (
-    set "FAILURE=interactive GUI task launcher copy failed"
-    goto :finish
-)
-
 schtasks /delete /tn %GUI_TASK% /f >nul 2>&1
-schtasks /create /tn %GUI_TASK% /tr "wscript.exe //B //Nologo %RUN_DIRECTORY%\run-gui-task.vbs %RUN_DIRECTORY%\run-gui-ci.cmd" /sc onlogon /ru ci /rp win7-poc-ephemeral /it /rl LIMITED /f > "%RUN_DIRECTORY%\gui-task-create.log" 2>&1
+schtasks /create /tn %GUI_TASK% /tr "cmd.exe /c call %RUN_DIRECTORY%\run-gui-ci.cmd" /sc onlogon /ru ci /rp win7-poc-ephemeral /it /rl LIMITED /f > "%RUN_DIRECTORY%\gui-task-create.log" 2>&1
 if errorlevel 1 (
     set "FAILURE=interactive GUI task registration failed"
     goto :finish
