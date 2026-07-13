@@ -22,7 +22,7 @@ results_volume="${results_image}@@1048576"
 
 rm -rf "$output_directory"
 mkdir -p "$output_directory"
-for evidence_file in result.txt failure.txt os.txt hash.txt verify-cli.log; do
+for evidence_file in result.txt failure.txt os.txt hash.txt verify-cli.log ucrt-install.log; do
     mcopy -o -i "$results_volume" "::$evidence_file" "$output_directory/$evidence_file"
     sed -i 's/\r$//' "$output_directory/$evidence_file"
 done

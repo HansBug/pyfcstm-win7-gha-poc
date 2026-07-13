@@ -107,69 +107,6 @@ jobs:
         shell: bash
         run: echo "${{ steps.msys2.outputs.msys2-location }}\\mingw64\\bin" >> "$GITHUB_PATH"
 
-      - name: Install the legacy Windows 10 SDK UCRT redist
-        shell: pwsh
-        run: |
-          $root = Join-Path $env:RUNNER_TEMP 'win7-ucrt'
-          $sdkSetup = Join-Path $env:RUNNER_TEMP 'sdksetup-10240.exe'
-          $sdkUrl = 'https://download.microsoft.com/download/E/1/F/E1F1E61E-F3C6-4420-A916-FB7C47FBC89E/standalonesdk/sdksetup.exe'
-          $sdkLayout = Join-Path $root 'layout'
-          $sdkInstall = Join-Path $root 'sdk'
-          $sdkLog = Join-Path $root 'sdksetup-layout.log'
-          New-Item -ItemType Directory -Force -Path $root | Out-Null
-          Invoke-WebRequest -UseBasicParsing -Uri $sdkUrl -OutFile $sdkSetup
-          $arguments = @(
-            '/layout', $sdkLayout,
-            '/quiet', '/norestart', '/ceip', 'off', '/log', $sdkLog
-          )
-          $process = Start-Process -FilePath $sdkSetup -ArgumentList $arguments -Wait -PassThru
-          if ($process.ExitCode -ne 0) {
-            if (Test-Path $sdkLog) {
-              Get-Content -Path $sdkLog -Tail 120
-            }
-            throw "Windows SDK 10.0.10240 layout failed with exit code $($process.ExitCode). See $sdkLog."
-          }
-          $ucrtMsi = Get-ChildItem -Path $sdkLayout -Filter 'Universal CRT Redistributable-x86_en-us.msi' -Recurse |
-            Select-Object -First 1
-          if (-not $ucrtMsi) {
-            throw 'The Windows SDK layout did not contain the official Universal CRT Redistributable MSI.'
-          }
-          New-Item -ItemType Directory -Force -Path $sdkInstall | Out-Null
-          $msiLog = Join-Path $root 'ucrt-msiexec.log'
-          $msiArguments = @(
-            '/a', $ucrtMsi.FullName,
-            '/qn', '/norestart',
-            "TARGETDIR=$sdkInstall",
-            "KITSROOT=$sdkInstall",
-            '/L*v', $msiLog
-          )
-          $msiProcess = Start-Process -FilePath "$env:WINDIR\System32\msiexec.exe" -ArgumentList $msiArguments -Wait -PassThru
-          if ($msiProcess.ExitCode -ne 0) {
-            if (Test-Path $msiLog) {
-              Get-Content -Path $msiLog -Tail 120
-            }
-            throw "The legacy SDK UCRT MSI extraction failed with exit code $($msiProcess.ExitCode). See $msiLog."
-          }
-          $ucrt = Join-Path $sdkInstall 'Redist\ucrt\DLLs\x64'
-          $required = @(
-            'ucrtbase.dll',
-            'api-ms-win-core-localization-l1-2-0.dll',
-            'api-ms-win-core-file-l2-1-0.dll'
-          )
-          foreach ($name in $required) {
-            if (-not (Test-Path (Join-Path $ucrt $name))) {
-              throw "The legacy SDK UCRT redist is missing $name under $ucrt."
-            }
-          }
-          $fileL2 = [IO.File]::ReadAllBytes((Join-Path $ucrt 'api-ms-win-core-file-l2-1-0.dll'))
-          $fileL2Text = [Text.Encoding]::ASCII.GetString($fileL2)
-          if ($fileL2Text.Contains('CopyFile2')) {
-            throw 'The selected UCRT file-l2 forwarder references CopyFile2, which is unavailable on Windows 7.'
-          }
-          "WIN7_UCRT_DIRECTORY=$ucrt" >> $env:GITHUB_ENV
-          "WIN7_UCRT_SDK_ROOT=$sdkInstall" >> $env:GITHUB_ENV
-          Get-ChildItem -Path $ucrt | Select-Object Name, Length
-
       - name: Set up Python 3.7
         uses: actions/setup-python@v6
         with:
@@ -211,8 +148,6 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/_source/pyfcstm"
-          ucrt_directory="$(cygpath -u "$WIN7_UCRT_DIRECTORY")"
-          export PATH="$ucrt_directory:$PATH"
           rm -rf "$(cygpath -u "$LOCALAPPDATA")/pyinstaller"
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-build.txt
@@ -220,19 +155,20 @@ jobs:
           python -c 'import PyInstaller; assert PyInstaller.__version__ == "4.10"'
           make tpl app_icons
           python -m tools.generate_spec -o pyfcstm.spec --icon-dir build/icons
+          python "$GITHUB_WORKSPACE/scripts/remove_win7_ucrt_binaries.py" pyfcstm.spec
           python "$GITHUB_WORKSPACE/scripts/add_win7_redist_binary.py" \
             pyfcstm.spec "$WIN7_MSVCP140_FILE"
           python "$GITHUB_WORKSPACE/scripts/add_win7_redist_binary.py" \
             pyfcstm.spec "$WIN7_VCRUNTIME140_1_FILE"
           pyinstaller pyfcstm.spec
           pyi-archive_viewer -l dist/pyfcstm.exe > build/pyi-archive.txt
-          grep -qi 'api-ms-win-core-localization-l1-2-0.dll' build/pyi-archive.txt
+          ! grep -qi 'api-ms-win-' build/pyi-archive.txt
+          ! grep -qi 'ucrtbase.dll' build/pyi-archive.txt
           grep -qi 'msvcp140.dll' build/pyi-archive.txt
           grep -qi 'vcruntime140_1.dll' build/pyi-archive.txt
           grep -q 'pyfcstm.png' build/pyi-archive.txt
           python - <<'PY'
           import ast
-          import os
           from pathlib import Path
 
           toc = ast.literal_eval(Path("build/pyfcstm/PKG-00.toc").read_text())
@@ -249,17 +185,10 @@ jobs:
                   for child in item:
                       yield from walk_toc(child)
 
-          def sdk_redist_source(filename):
-              entries = [entry for entry in walk_toc(toc) if entry[0].lower() == filename]
-              assert len(entries) == 1, entries
-              source = entries[0][1].replace("\\", "/").lower()
-              print(f"{filename} source:", source)
-              expected_root = os.path.normpath(os.environ["WIN7_UCRT_DIRECTORY"]).replace("\\", "/").lower()
-              assert source.startswith(expected_root + "/"), (source, expected_root)
-              assert source.endswith(f"/ucrt/dlls/x64/{filename}"), source
-
-          sdk_redist_source("ucrtbase.dll")
-          sdk_redist_source("api-ms-win-core-localization-l1-2-0.dll")
+          assert not any(
+              entry[0].lower() == "ucrtbase.dll" or entry[0].lower().startswith("api-ms-win-")
+              for entry in walk_toc(toc)
+          )
 
           msvcp_entries = [
               entry for entry in walk_toc(toc) if entry[0].lower() == "msvcp140.dll"
@@ -299,7 +228,7 @@ jobs:
           exe_sha256="$(python -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest().upper())' "$payload_dir/pyfcstm.exe")"
           pyinstaller_version="$(python -c 'import PyInstaller; print(PyInstaller.__version__)')"
           api_set_forwarders="$(grep -ci 'api-ms-win-' "$source_dir/build/pyi-archive.txt" || true)"
-          test "$api_set_forwarders" -gt 0
+          test "$api_set_forwarders" -eq 0
           pyfcstm_commit="$(git -C "$source_dir" rev-parse HEAD)"
           {
             printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit"
@@ -421,6 +350,16 @@ jobs:
           rm -rf "$inspection_dir"
 
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
+          ucrt_zip="$work_dir/WindowsUCRT.zip"
+          ucrt_directory="$work_dir/win7-ucrt"
+          curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
+            --output "$ucrt_zip" \
+            'https://download.microsoft.com/download/3/1/1/311c06c1-f162-405c-b538-d9dc3a4007d1/WindowsUCRT.zip'
+          mkdir -p "$ucrt_directory"
+          7z e -y "-o$ucrt_directory" "$ucrt_zip" 'Windows6.1-KB3118401-x64.msu' >/dev/null
+          cp "$ucrt_directory/Windows6.1-KB3118401-x64.msu" build-payload/win7-ucrt.msu
+          ucrt_sha256="$(sha256sum build-payload/win7-ucrt.msu | awk '{print toupper($1)}')"
+          printf 'win7_ucrt_msu_sha256=%s\n' "$ucrt_sha256" >> build-payload/build-metadata.txt
           bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
           bash scripts/build_unattend_floppy.sh "$work_dir/unattend.img" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
           bash scripts/build_results_image.sh "$work_dir/win7-results.img"
