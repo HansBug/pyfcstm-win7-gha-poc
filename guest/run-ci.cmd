@@ -56,15 +56,33 @@ if not exist "%RUN_DIRECTORY%\ucrt-installed.txt" (
 )
 
 copy /Y "%PAYLOAD_DRIVE%\pyfcstm.exe" "%RUN_DIRECTORY%\pyfcstm.exe" >nul
+copy /Y "%PAYLOAD_DRIVE%\fcstm-gui.exe" "%RUN_DIRECTORY%\fcstm-gui.exe" >nul
 copy /Y "%PAYLOAD_DRIVE%\smt-verify.fcstm" "%RUN_DIRECTORY%\smt-verify.fcstm" >nul
+copy /Y "%PAYLOAD_DRIVE%\vcruntime140_1.dll" "%RUN_DIRECTORY%\vcruntime140_1.dll" >nul
+copy /Y "%PAYLOAD_DRIVE%\build-metadata.txt" "%RUN_DIRECTORY%\build-metadata.txt" >nul
+copy /Y "%PAYLOAD_DRIVE%\fcstm-gui-build-metadata.txt" "%RUN_DIRECTORY%\fcstm-gui-build-metadata.txt" >nul
+xcopy /E /I /H /Y "%PAYLOAD_DRIVE%\java-runtime" "%RUN_DIRECTORY%\java-runtime" >nul
 if not exist "%RUN_DIRECTORY%\pyfcstm.exe" (
     set "FAILURE=executable copy failed"
     goto :finish
 )
+if not exist "%RUN_DIRECTORY%\fcstm-gui.exe" (
+    set "FAILURE=fcstm-gui executable copy failed"
+    goto :finish
+)
+if not exist "%RUN_DIRECTORY%\java-runtime\bin\java.exe" (
+    set "FAILURE=portable Java runtime copy failed"
+    goto :finish
+)
 
-call "%PAYLOAD_DRIVE%\verify-cli.cmd" "%RUN_DIRECTORY%" > "%RUN_DIRECTORY%\verify-cli.log" 2>&1
+call "%PAYLOAD_DRIVE%\verify-cli.cmd" "%RUN_DIRECTORY%" > "%RUN_DIRECTORY%\pyfcstm-verify.log" 2>&1
 if errorlevel 1 (
-    set "FAILURE=verify-cli.cmd returned a nonzero status"
+    set "FAILURE=pyfcstm verify-cli.cmd returned a nonzero status"
+    goto :finish
+)
+call "%PAYLOAD_DRIVE%\verify-gui.cmd" "%RUN_DIRECTORY%" > "%RUN_DIRECTORY%\fcstm-gui-self-check.log" 2>&1
+if errorlevel 1 (
+    set "FAILURE=fcstm-gui verify-gui.cmd returned a nonzero status"
     goto :finish
 )
 set "STATUS=PASS"
@@ -82,7 +100,13 @@ set "FAILURE="
     wmic os get OSArchitecture /value
 )
 certutil -hashfile "%RUN_DIRECTORY%\pyfcstm.exe" SHA256 > "%RESULT_DRIVE%\hash.txt" 2>&1
-copy /Y "%RUN_DIRECTORY%\verify-cli.log" "%RESULT_DRIVE%\verify-cli.log" >nul 2>&1
+certutil -hashfile "%RUN_DIRECTORY%\fcstm-gui.exe" SHA256 > "%RESULT_DRIVE%\fcstm-gui-hash.txt" 2>&1
+copy /Y "%RUN_DIRECTORY%\pyfcstm-verify.log" "%RESULT_DRIVE%\pyfcstm-verify.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\fcstm-gui-self-check.log" "%RESULT_DRIVE%\fcstm-gui-self-check.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\fcstm-gui-self-check.json" "%RESULT_DRIVE%\fcstm-gui-self-check.json" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\java-version-guest.txt" "%RESULT_DRIVE%\java-version-guest.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\build-metadata.txt" "%RESULT_DRIVE%\build-metadata.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\fcstm-gui-build-metadata.txt" "%RESULT_DRIVE%\fcstm-gui-build-metadata.txt" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\ucrt-install.log" "%RESULT_DRIVE%\ucrt-install.log" >nul 2>&1
 schtasks /delete /tn PyfcstmWin7Poc /f >nul 2>&1
 

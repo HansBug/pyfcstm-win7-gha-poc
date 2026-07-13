@@ -1,16 +1,20 @@
-# pyfcstm Windows 7 GitHub Actions PoC
+# pyfcstm and fcstm-gui Windows 7 GitHub Actions PoC
 
 This repository contains only orchestration for a Windows 7 compatibility
 gate. It does not vendor, mirror, submodule, or commit `pyfcstm` source code.
-The build job checks out `HansBug/pyfcstm@main` into its temporary runner
-workspace, creates `dist/pyfcstm.exe`, and passes only the EXE plus one
-upstream DSL fixture to the guest job as a short-lived Actions artifact.
+The build jobs check out upstream sources into their temporary runner
+workspaces, create a Windows `pyfcstm.exe` from
+`HansBug/pyfcstm@dev/s714-acceptance-artifacts` and a Windows
+`fcstm-gui.exe` from `zhougut/fcstm-gui@main`, then pass only those products,
+their metadata, a portable Java runtime, and one upstream DSL fixture to the
+guest job as short-lived Actions artifacts.
 
 ## What the workflow proves
 
 The workflow uses only GitHub-hosted runners:
 
-1. `windows-2022` checks out `HansBug/pyfcstm@main` and runs its existing
+1. One `windows-2022` job checks out the requested
+   `HansBug/pyfcstm@dev/s714-acceptance-artifacts` source and runs its existing
    Windows standalone build path with Python 3.7. The PoC pins
    `PyInstaller==4.10`: its documentation still says Windows 7 should work,
    while PyInstaller 5 and later list Windows 8 as the support floor.
@@ -28,32 +32,40 @@ The workflow uses only GitHub-hosted runners:
    `MSVCP140.dll` is deliberately excluded because it imports `CopyFile2`.
    Microsoft prefers central UCRT deployment for normal end-user installations,
    so the ephemeral guest uses that documented model directly.
-2. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
+2. A second `windows-2022` job checks out `zhougut/fcstm-gui@main` and follows
+   that repository's documented Windows method: Python 3.7, Java 11, MSYS2
+   Cairo, `make ui`, `pyinstaller --noconfirm main.spec`, and the product's
+   `--self-check --json-report` gate. The source and onefile checks must report
+   `182/182` passed before the GUI payload is uploaded. A Java 11 runtime made
+   with `jlink` is carried into the guest because the GUI self-check executes
+   PlantUML locally and the guest deliberately has no network.
+3. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
    Windows 7 virtual disk for this run.
-3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
+4. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
    The guest has no virtual NIC.
-4. Windows Setup reads `Autounattend.xml`, installs unattended, registers its
+5. Windows Setup reads `Autounattend.xml`, installs unattended, registers its
    `SetupComplete.cmd` hook from an offline payload CD, runs the EXE, writes
    evidence to a FAT result disk, and shuts down before interactive login.
-5. The Linux host accepts a run only when the returned caption names Windows 7
+6. The Linux host accepts a run only when the returned caption names Windows 7
    and the returned values are exactly `Version=6.1.7601`, `BuildNumber=7601`,
    `ServicePackMajorVersion=1`, `ProductType=1`, and `OSArchitecture=64-bit`.
-   The guest's SHA-256 must equal the Windows build artifact, and the CLI
-   smoke, PlantUML, and SMT/Z3 inspect commands must succeed.
+   Both guest executable SHA-256 values must equal their Windows build
+   artifacts. The pyfcstm CLI smoke, PlantUML, and SMT/Z3 inspect commands,
+   plus the fcstm-gui `182/182` self-check report, must succeed.
 
 `ProductType=1` is essential: it rejects Windows Server 2008 R2, which shares
 the 6.1 kernel family but is not Windows 7. Requiring a Windows 7 caption also
 prevents a componentized Embedded Standard 7 image from being labelled as a
 Windows 7 client result.
 
-The first fully green end-to-end run is
+The first fully green pyfcstm-only end-to-end run is
 [`29225447512`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29225447512).
 Its evidence reports Windows 7 Home Basic SP1 x64 (`6.1.7601`, product type
 1), a zero QEMU exit status, `result.txt=PASS`, and an executable hash matching
-the Windows build artifact. The guest CLI checks covered version/help,
-PlantUML generation, and SMT/Z3 inspection. Future runs must continue to
-publish `win7-verification-evidence` before a new build is described as
-verified.
+the Windows build artifact. That earlier run predates the two-product gate and
+covered only version/help, PlantUML generation, and SMT/Z3 inspection. The
+two-product workflow must publish a fresh `win7-verification-evidence` artifact
+before either product is described as Win7-verified.
 
 ## Required configuration
 
@@ -68,6 +80,9 @@ dispatching the workflow:
 | `WIN7_IMAGE_INDEX` | Actions variable | Positive `install.wim` image index for Windows 7 SP1 x64 |
 | `WIN7_LOCALE` | Actions variable | ISO UI language in the form `en-US` or `zh-CN`, defaults to `en-US` |
 | `WIN7_ISO_FALLBACK_URLS` | Actions variable | Optional newline-separated alternate URLs for the same hash-verified ISO |
+
+The dispatch form also accepts `pyfcstm_ref`; its default is
+`dev/s714-acceptance-artifacts`.
 
 The current public fallback is the content-addressed IPFS URL
 `https://ipfs.io/ipfs/bafybeiefkfbbmwcdhuuva34ufircuc4w266gmdvv4ojakxqeqp5o4vc3wy`.
@@ -94,13 +109,14 @@ persisting an activated golden image.
 
 The workflow runs weekly and can also receive a `repository_dispatch` event
 named `verify-pyfcstm-main`. That event lets an authorized sender trigger the
-independent gate after a change in `HansBug/pyfcstm`; it does not make this
-repository contain source code. A source-repository release gate would need a
-separate, explicit dispatch credential or GitHub App configuration.
+independent gate after a change in either upstream repository; it does not make
+this repository contain their source code. A source-repository release gate
+would need a separate, explicit dispatch credential or GitHub App configuration.
 
 On every attempt, the `win7-verification-evidence` artifact retains the serial
-log, FAT result image, guest OS report, EXE hash report, and CLI log for 30
-days. The ISO and the guest system disk are intentionally excluded.
+log, FAT result image, guest OS report, both executable hash reports, the
+pyfcstm CLI log, the fcstm-gui self-check JSON/log, and the guest Java version
+for 30 days. The ISO and the guest system disk are intentionally excluded.
 
 ## Research conclusions
 

@@ -1,4 +1,4 @@
-name: Verify pyfcstm CLI on Windows 7 SP1
+name: Verify pyfcstm and fcstm-gui on Windows 7 SP1
 
 on:
   workflow_dispatch:
@@ -22,6 +22,11 @@ on:
       qemu_timeout_seconds:
         description: Optional QEMU guest timeout in seconds, defaults to 5400.
         required: false
+        type: string
+      pyfcstm_ref:
+        description: pyfcstm branch or commit to build, defaults to the acceptance branch.
+        required: false
+        default: dev/s714-acceptance-artifacts
         type: string
   repository_dispatch:
     types: [verify-pyfcstm-main]
@@ -72,21 +77,22 @@ jobs:
             exit 2
           }
 
-  build-pyfcstm-main:
-    name: Build pyfcstm main on Windows 2022
+  build-pyfcstm-acceptance:
+    name: Build pyfcstm acceptance branch on Windows 2022
     needs: validate-licensed-media
     runs-on: windows-2022
     outputs:
       pyfcstm_commit: ${{ steps.metadata.outputs.pyfcstm_commit }}
+      pyfcstm_ref: ${{ steps.metadata.outputs.pyfcstm_ref }}
     steps:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
 
-      - name: Checkout pyfcstm main for this build
+      - name: Checkout pyfcstm acceptance source for this build
         uses: actions/checkout@v4
         with:
           repository: HansBug/pyfcstm
-          ref: main
+          ref: ${{ inputs.pyfcstm_ref || 'dev/s714-acceptance-artifacts' }}
           path: _source/pyfcstm
           fetch-depth: 1
 
@@ -130,7 +136,7 @@ jobs:
           }
           "WIN7_VCRUNTIME140_1_FILE=$($vcruntime.FullName)" >> $env:GITHUB_ENV
 
-      - name: Build Windows 7-compatible standalone CLI from pyfcstm main
+      - name: Build Windows 7-compatible standalone CLI from pyfcstm acceptance source
         shell: bash
         env:
           IS_WIN: "1"
@@ -230,12 +236,14 @@ jobs:
           pyfcstm_commit="$(git -C "$source_dir" rev-parse HEAD)"
           {
             printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit"
+            printf 'pyfcstm_ref=%s\n' "${{ inputs.pyfcstm_ref || 'dev/s714-acceptance-artifacts' }}"
             printf 'pyinstaller_version=%s\n' "$pyinstaller_version"
             printf 'api_ms_win_forwarders=%s\n' "$api_set_forwarders"
             printf 'python_version=%s\n' "$(python --version)"
             printf 'pyfcstm_exe_sha256=%s\n' "$exe_sha256"
           } > "$payload_dir/build-metadata.txt"
           printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit" >> "$GITHUB_OUTPUT"
+          printf 'pyfcstm_ref=%s\n' "${{ inputs.pyfcstm_ref || 'dev/s714-acceptance-artifacts' }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload only the executable and test payload
         uses: actions/upload-artifact@v4
@@ -245,9 +253,139 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  build-fcstm-gui:
+    name: Build fcstm-gui main on Windows 2022
+    needs: validate-licensed-media
+    runs-on: windows-2022
+    outputs:
+      fcstm_gui_commit: ${{ steps.metadata.outputs.fcstm_gui_commit }}
+    steps:
+      - name: Checkout PoC orchestration only
+        uses: actions/checkout@v4
+
+      - name: Checkout fcstm-gui main for this build
+        uses: actions/checkout@v4
+        with:
+          repository: zhougut/fcstm-gui
+          ref: main
+          path: _source/fcstm-gui
+          fetch-depth: 1
+
+      - name: Install Windows GUI build tools
+        shell: bash
+        run: choco install make zip --no-progress --yes
+
+      - name: Install Cairo runtime
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-cairo
+
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.7"
+
+      - name: Set up Java 11 for the GUI build and guest runtime
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Select Windows 7 app-local runtime files
+        shell: pwsh
+        run: |
+          $visualStudioRoots = @(
+            (Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio'),
+            (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio')
+          ) | Where-Object { Test-Path $_ }
+          $vcruntime = $visualStudioRoots |
+            ForEach-Object { Get-ChildItem -Path $_ -Filter vcruntime140_1.dll -File -Recurse } |
+            Where-Object {
+              $_.FullName -match '\\VC\\Redist\\MSVC\\.+\\x64\\Microsoft\.VC\d+\.CRT\\vcruntime140_1\.dll$'
+            } |
+            Select-Object -First 1
+          if (-not $vcruntime) {
+            throw 'Could not locate VCRUNTIME140_1.dll in the x64 Visual C++ Redist.'
+          }
+          "WIN7_VCRUNTIME140_1_FILE=$($vcruntime.FullName)" >> $env:GITHUB_ENV
+
+      - name: Build fcstm-gui main with its documented Windows method
+        shell: bash
+        env:
+          FCSTM_GUI_BUILD_MODE: onefile
+          FCSTM_GUI_PRODUCT_LAYOUT: onefile
+          QT_QPA_PLATFORM: windows
+        run: |
+          set -euo pipefail
+          source_dir="$GITHUB_WORKSPACE/_source/fcstm-gui"
+          mingw_bin="$(cygpath -u '${{ steps.msys2.outputs.msys2-location }}\mingw64\bin')"
+          export PATH="$PATH:$mingw_bin"
+          cd "$source_dir"
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt -r requirements-test.txt -r requirements.txt
+          make ui
+          mkdir -p build
+          python main.py --self-check --json-report build/source-self-check.json 2>&1 | tee build/source-self-check.log
+          grep -F '"status": "passed"' build/source-self-check.json
+          grep -F '"passed": 182' build/source-self-check.json
+          pyinstaller --noconfirm main.spec 2>&1 | tee build/pyinstaller.log
+          test -f dist/fcstm-gui.exe
+          dist/fcstm-gui.exe --self-check --json-report build/onefile-self-check.json 2>&1 | tee build/onefile-self-check.log
+          grep -F '"status": "passed"' build/onefile-self-check.json
+          grep -F '"passed": 182' build/onefile-self-check.json
+
+      - name: Create a portable Java runtime for the Win7 guest
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$GITHUB_WORKSPACE/_source/fcstm-gui"
+          payload_dir="$GITHUB_WORKSPACE/gui-payload"
+          mkdir -p "$payload_dir"
+          java_home="$(cygpath -u "${JAVA_HOME_11_X64:-$JAVA_HOME}")"
+          payload_dir_win="$(cygpath -w "$payload_dir")"
+          "$java_home/bin/jlink.exe" \
+            --add-modules ALL-MODULE-PATH \
+            --strip-debug \
+            --no-man-pages \
+            --no-header-files \
+            --compress=2 \
+            --output "${payload_dir_win}\\java-runtime"
+          test -f "$payload_dir/java-runtime/bin/java.exe"
+          "$payload_dir/java-runtime/bin/java.exe" -version 2>&1 | tee "$payload_dir/java-version.txt"
+          cp "$source_dir/dist/fcstm-gui.exe" "$payload_dir/fcstm-gui.exe"
+          cp "$source_dir/build/source-self-check.json" "$payload_dir/source-self-check.json"
+          cp "$source_dir/build/onefile-self-check.json" "$payload_dir/onefile-self-check.json"
+          cp "$source_dir/build/onefile-self-check.log" "$payload_dir/onefile-self-check.log"
+          cp "$source_dir/build/pyinstaller.log" "$payload_dir/pyinstaller.log"
+          cp "$WIN7_VCRUNTIME140_1_FILE" "$payload_dir/vcruntime140_1.dll"
+          gui_sha256="$(python -c 'import hashlib, pathlib; print(hashlib.sha256(pathlib.Path("gui-payload/fcstm-gui.exe").read_bytes()).hexdigest().upper())')"
+          fcstm_gui_commit="$(git -C "$source_dir" rev-parse HEAD)"
+          {
+            printf 'fcstm_gui_commit=%s\n' "$fcstm_gui_commit"
+            printf 'fcstm_gui_ref=main\n'
+            printf 'fcstm_gui_exe_sha256=%s\n' "$gui_sha256"
+            printf 'python_version=%s\n' "$(python --version)"
+            printf 'pyinstaller_version=%s\n' "$(python -c 'import PyInstaller; print(PyInstaller.__version__)')"
+            printf 'pyfcstm_dependency=%s\n' "$(python -c 'import importlib.metadata; print(importlib.metadata.distribution("pyfcstm").version)')"
+          } > "$payload_dir/fcstm-gui-build-metadata.txt"
+          printf 'fcstm_gui_commit=%s\n' "$fcstm_gui_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the fcstm-gui Windows payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcstm-gui-win7-payload
+          path: gui-payload
+          retention-days: 14
+          if-no-files-found: error
+
   verify-on-win7:
-    name: Boot Windows 7 SP1 and execute the built CLI
-    needs: [validate-licensed-media, build-pyfcstm-main]
+    name: Boot Windows 7 SP1 and execute both built products
+    needs: [validate-licensed-media, build-pyfcstm-acceptance, build-fcstm-gui]
     runs-on: ubuntu-24.04
     env:
       WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
@@ -260,10 +398,16 @@ jobs:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
 
-      - name: Download the executable built in the preceding job
+      - name: Download the pyfcstm acceptance payload
         uses: actions/download-artifact@v4
         with:
           name: pyfcstm-win7-payload
+          path: build-payload
+
+      - name: Download the fcstm-gui Windows payload
+        uses: actions/download-artifact@v4
+        with:
+          name: fcstm-gui-win7-payload
           path: build-payload
 
       - name: Validate the licensed installation-media configuration
@@ -347,7 +491,8 @@ jobs:
           grep -E '^Architecture:[[:space:]]+x86_64' "$image_info" >/dev/null
           rm -rf "$inspection_dir"
 
-          expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
+          expected_pyfcstm_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
+          expected_gui_sha256="$(sha256sum build-payload/fcstm-gui.exe | awk '{print toupper($1)}')"
           ucrt_zip="$work_dir/WindowsUCRT.zip"
           ucrt_directory="$work_dir/win7-ucrt"
           ucrt_msu_directory="$work_dir/win7-ucrt-msu"
@@ -373,7 +518,8 @@ jobs:
           printf 'results_image=%s\n' "$work_dir/win7-results.img" >> "$GITHUB_OUTPUT"
           printf 'work_dir=%s\n' "$work_dir" >> "$GITHUB_OUTPUT"
           printf 'image_info=%s\n' "$image_info" >> "$GITHUB_OUTPUT"
-          printf 'exe_sha256=%s\n' "$expected_sha256" >> "$GITHUB_OUTPUT"
+          printf 'pyfcstm_sha256=%s\n' "$expected_pyfcstm_sha256" >> "$GITHUB_OUTPUT"
+          printf 'fcstm_gui_sha256=%s\n' "$expected_gui_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Install Windows 7 SP1 and run the candidate executable
         id: qemu
@@ -396,7 +542,8 @@ jobs:
         run: |
           bash scripts/collect_win7_results.sh \
             "${{ steps.media.outputs.results_image }}" \
-            "${{ steps.media.outputs.exe_sha256 }}" \
+            "${{ steps.media.outputs.pyfcstm_sha256 }}" \
+            "${{ steps.media.outputs.fcstm_gui_sha256 }}" \
             guest-evidence
 
       - name: Upload non-redistributable verification evidence

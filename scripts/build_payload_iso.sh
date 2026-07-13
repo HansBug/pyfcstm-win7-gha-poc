@@ -25,12 +25,17 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
     exit 64
 }
 
-for required_file in pyfcstm.exe smt-verify.fcstm build-metadata.txt win7-ucrt.cab; do
+for required_file in pyfcstm.exe fcstm-gui.exe smt-verify.fcstm build-metadata.txt \
+    fcstm-gui-build-metadata.txt win7-ucrt.cab; do
     [[ -f "$payload_directory/$required_file" ]] || {
         echo "payload is missing $required_file" >&2
         exit 66
     }
 done
+[[ -f "$payload_directory/java-runtime/bin/java.exe" ]] || {
+    echo "payload is missing java-runtime/bin/java.exe" >&2
+    exit 66
+}
 
 staging_directory=$(mktemp -d)
 cleanup() {
@@ -45,10 +50,19 @@ sed \
 cp "$repository_root/guest/run-ci.cmd" "$staging_directory/run-ci.cmd"
 cp "$repository_root/guest/install-hook.cmd" "$staging_directory/install-hook.cmd"
 cp "$repository_root/guest/verify-cli.cmd" "$staging_directory/verify-cli.cmd"
+cp "$repository_root/guest/verify-gui.cmd" "$staging_directory/verify-gui.cmd"
 cp "$payload_directory/pyfcstm.exe" "$staging_directory/pyfcstm.exe"
+cp "$payload_directory/fcstm-gui.exe" "$staging_directory/fcstm-gui.exe"
 cp "$payload_directory/smt-verify.fcstm" "$staging_directory/smt-verify.fcstm"
 cp "$payload_directory/build-metadata.txt" "$staging_directory/build-metadata.txt"
+cp "$payload_directory/fcstm-gui-build-metadata.txt" "$staging_directory/fcstm-gui-build-metadata.txt"
 cp "$payload_directory/win7-ucrt.cab" "$staging_directory/win7-ucrt.cab"
+cp -R "$payload_directory/java-runtime" "$staging_directory/java-runtime"
+for optional_file in source-self-check.json onefile-self-check.json onefile-self-check.log pyinstaller.log java-version.txt vcruntime140_1.dll; do
+    if [[ -f "$payload_directory/$optional_file" ]]; then
+        cp "$payload_directory/$optional_file" "$staging_directory/$optional_file"
+    fi
+done
 
 mkdir -p "$(dirname "$output_iso")"
 xorriso -as mkisofs \
