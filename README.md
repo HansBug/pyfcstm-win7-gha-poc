@@ -22,11 +22,12 @@ The workflow uses only GitHub-hosted runners:
    running the EXE; if Windows requests a reboot, a SYSTEM `schtasks` logon
    continuation completes the check after the reboot. This avoids shipping
    newer hosted-SDK forwarders, including the
-   `CopyFile2` import that Windows 7 does not provide. The workflow still
-   bundles required `MSVCP140.dll` and `VCRUNTIME140_1.dll` files from the
-   hosted runner's Visual C++ Redist directory. Microsoft prefers central UCRT
-   deployment for normal end-user installations, so the ephemeral guest uses
-   that documented model directly.
+   `CopyFile2` import that Windows 7 does not provide. The workflow keeps the
+   older `MSVCP140.dll` shipped by the z3 wheel and injects only the required
+   `VCRUNTIME140_1.dll` from the hosted runner; the current Windows 2022
+   `MSVCP140.dll` is deliberately excluded because it imports `CopyFile2`.
+   Microsoft prefers central UCRT deployment for normal end-user installations,
+   so the ephemeral guest uses that documented model directly.
 2. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
    Windows 7 virtual disk for this run.
 3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
