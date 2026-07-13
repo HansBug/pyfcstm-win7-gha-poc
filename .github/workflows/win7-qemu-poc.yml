@@ -24,9 +24,9 @@ on:
         required: false
         type: string
       pyfcstm_ref:
-        description: pyfcstm branch or commit to build, defaults to the acceptance branch.
+        description: pyfcstm branch or commit to build, defaults to main.
         required: false
-        default: dev/s714-acceptance-artifacts
+        default: main
         type: string
   repository_dispatch:
     types: [verify-pyfcstm-main]
@@ -77,8 +77,8 @@ jobs:
             exit 2
           }
 
-  build-pyfcstm-acceptance:
-    name: Build pyfcstm acceptance branch on Windows 2022
+  build-pyfcstm:
+    name: Build pyfcstm main on Windows 2022
     needs: validate-licensed-media
     runs-on: windows-2022
     outputs:
@@ -88,11 +88,11 @@ jobs:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
 
-      - name: Checkout pyfcstm acceptance source for this build
+      - name: Checkout pyfcstm main source for this build
         uses: actions/checkout@v4
         with:
           repository: HansBug/pyfcstm
-          ref: ${{ inputs.pyfcstm_ref || 'dev/s714-acceptance-artifacts' }}
+          ref: ${{ inputs.pyfcstm_ref || 'main' }}
           path: _source/pyfcstm
           fetch-depth: 1
 
@@ -136,7 +136,7 @@ jobs:
           }
           "WIN7_VCRUNTIME140_1_FILE=$($vcruntime.FullName)" >> $env:GITHUB_ENV
 
-      - name: Build Windows 7-compatible standalone CLI from pyfcstm acceptance source
+      - name: Build Windows 7-compatible standalone CLI from pyfcstm source
         shell: bash
         env:
           IS_WIN: "1"
@@ -246,14 +246,14 @@ jobs:
           pyfcstm_commit="$(git -C "$source_dir" rev-parse HEAD)"
           {
             printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit"
-            printf 'pyfcstm_ref=%s\n' "${{ inputs.pyfcstm_ref || 'dev/s714-acceptance-artifacts' }}"
+            printf 'pyfcstm_ref=%s\n' "${{ inputs.pyfcstm_ref || 'main' }}"
             printf 'pyinstaller_version=%s\n' "$pyinstaller_version"
             printf 'api_ms_win_forwarders=%s\n' "$api_set_forwarders"
             printf 'python_version=%s\n' "$(python --version)"
             printf 'pyfcstm_exe_sha256=%s\n' "$exe_sha256"
           } > "$payload_dir/build-metadata.txt"
           printf 'pyfcstm_commit=%s\n' "$pyfcstm_commit" >> "$GITHUB_OUTPUT"
-          printf 'pyfcstm_ref=%s\n' "${{ inputs.pyfcstm_ref || 'dev/s714-acceptance-artifacts' }}" >> "$GITHUB_OUTPUT"
+          printf 'pyfcstm_ref=%s\n' "${{ inputs.pyfcstm_ref || 'main' }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload only the executable and test payload
         uses: actions/upload-artifact@v4
@@ -395,7 +395,7 @@ jobs:
 
   verify-on-win7:
     name: Boot Windows 7 SP1 and execute both built products
-    needs: [validate-licensed-media, build-pyfcstm-acceptance, build-fcstm-gui]
+    needs: [validate-licensed-media, build-pyfcstm, build-fcstm-gui]
     runs-on: ubuntu-24.04
     env:
       WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
@@ -408,7 +408,7 @@ jobs:
       - name: Checkout PoC orchestration only
         uses: actions/checkout@v4
 
-      - name: Download the pyfcstm acceptance payload
+      - name: Download the pyfcstm payload
         uses: actions/download-artifact@v4
         with:
           name: pyfcstm-win7-payload

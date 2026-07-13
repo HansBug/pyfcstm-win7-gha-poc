@@ -14,14 +14,14 @@ The current gate validates two products:
 
 | Product | Upstream checkout | Guest assertion |
 | --- | --- | --- |
-| `pyfcstm.exe` | `HansBug/pyfcstm@dev/s714-acceptance-artifacts` | guest CLI self-check (`15/15`), artifact hash |
+| `pyfcstm.exe` | `HansBug/pyfcstm@main` | guest CLI self-check (`15/15`), artifact hash |
 | `fcstm-gui.exe` | `zhougut/fcstm-gui@main` | `--self-check --json-report`, `182/182`, artifact hash |
 
 ## Verified Baseline
 
 The latest complete two-product verification is run
-[`29230920943`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29230920943),
-from PoC commit `f5220d44cdb1b8a1f894ad8b8ec0a6bf7b4ef2b3`.
+[`29239888742`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29239888742),
+from PoC commit `1df3056`.
 
 | Check | Result |
 | --- | --- |
@@ -30,9 +30,10 @@ from PoC commit `f5220d44cdb1b8a1f894ad8b8ec0a6bf7b4ef2b3`.
 | Guest | Windows 7 Home Basic, `6.1.7601`, SP1, x64, `ProductType=1` |
 | QEMU exit status | `0` |
 | Guest result | `PASS` |
-| `pyfcstm` source commit | `f142a656df43e0b80ed6b7ac63b0696345325646` |
-| `pyfcstm` SHA-256 | `067754472F45016FBE9EFEF891A60ACDFC9C90DBE245186E49DD17582DE45669` |
-| `pyfcstm` guest self-check | Added after this baseline; the next successful run must report `15/15`, `failed=0` |
+| `pyfcstm` source ref | `main` |
+| `pyfcstm` source commit | `971687ca5649cd01bf00239179e38ffda8b5e838` |
+| `pyfcstm` SHA-256 | `75506CA2EEB1B3B9DC69BD661C3D82F0828EC09080F0DEF3487B3E5DEA86F3A8` |
+| `pyfcstm` guest self-check | `15/15`, `failed=0` |
 | `fcstm-gui` source commit | `62546ad6fa74d700a4cdc5697ee03daa37e1b21a` |
 | `fcstm-gui` source self-check | `182/182`, `failed=0` |
 | `fcstm-gui` onefile self-check | `182/182`, `failed=0` |
@@ -105,7 +106,7 @@ and QEMU timeout. No build or guest job starts when this gate fails.
 
 ### Phase 2: Build `pyfcstm.exe`
 
-The `build-pyfcstm-acceptance` job checks out upstream source into
+The `build-pyfcstm` job checks out upstream source into
 `_source/pyfcstm`; the PoC source tree remains separate:
 
 1. Install Python `3.7`, GNU Make, ZIP tooling, MSYS2 Cairo, and upstream requirements.
@@ -253,7 +254,7 @@ Configure these repository settings before dispatching:
 
 The dispatch form can temporarily override URL, digest, image index, locale,
 QEMU timeout, and `pyfcstm_ref` without changing saved settings. The default
-`pyfcstm_ref` is `dev/s714-acceptance-artifacts`.
+`pyfcstm_ref` defaults to `main`.
 
 ### Manual dispatch with `gh`
 
@@ -303,8 +304,8 @@ committed here.
 
 ### Upstream source URLs
 
-- [`HansBug/pyfcstm` acceptance branch](https://github.com/HansBug/pyfcstm/tree/dev/s714-acceptance-artifacts)
-- [`pyfcstm` verified commit](https://github.com/HansBug/pyfcstm/commit/f142a656df43e0b80ed6b7ac63b0696345325646)
+- [`HansBug/pyfcstm` main](https://github.com/HansBug/pyfcstm/tree/main)
+- [`pyfcstm` verified commit](https://github.com/HansBug/pyfcstm/commit/971687ca5649cd01bf00239179e38ffda8b5e838)
 - [`zhougut/fcstm-gui` main](https://github.com/zhougut/fcstm-gui/tree/main)
 - [`fcstm-gui` verified commit](https://github.com/zhougut/fcstm-gui/commit/62546ad6fa74d700a4cdc5697ee03daa37e1b21a)
 - [`fcstm-gui` documented Windows workflow](https://github.com/zhougut/fcstm-gui/blob/main/.github/workflows/fast-verify.yml)
@@ -462,13 +463,13 @@ and attach the successful run URL to the review or release note.
 
 - [PyInstaller 4.10 requirements](https://pyinstaller.org/en/v4.10/requirements.html)
 - [PyInstaller 5.13.2 requirements](https://pyinstaller.org/en/v5.13.2/requirements.html)
-- [`pyfcstm` acceptance branch](https://github.com/HansBug/pyfcstm/tree/dev/s714-acceptance-artifacts)
+- [`HansBug/pyfcstm` main](https://github.com/HansBug/pyfcstm/tree/main)
 - [`fcstm-gui` main](https://github.com/zhougut/fcstm-gui/tree/main)
 - [`fcstm-gui` documented Windows workflow](https://github.com/zhougut/fcstm-gui/blob/main/.github/workflows/fast-verify.yml)
 
 ### Repository evidence
 
-- [Latest successful two-product run](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29230920943)
+- [Latest successful two-product run](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29239888742)
 - [PoC workflow](.github/workflows/win7-qemu-poc.yml)
 - [Guest CLI verifier](guest/verify-cli.cmd)
 - [Guest GUI verifier](guest/verify-gui.cmd)
