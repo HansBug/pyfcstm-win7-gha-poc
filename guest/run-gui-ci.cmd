@@ -78,7 +78,11 @@ set "FAILURE="
 
 :finish
 > "%RESULT_DRIVE%\result.txt" echo %STATUS%
-> "%RESULT_DRIVE%\failure.txt" echo %FAILURE%
+if defined FAILURE (
+    > "%RESULT_DRIVE%\failure.txt" echo %FAILURE%
+) else (
+    > "%RESULT_DRIVE%\failure.txt" echo.
+)
 > "%RESULT_DRIVE%\gui-stage.txt" echo %STATUS%
 xcopy /E /I /H /Y "%RUN_DIRECTORY%\fcstm-gui-acceptance-artifacts" "%RESULT_DRIVE%\fcstm-gui-acceptance-artifacts" >nul 2>&1
 if exist "%RUN_DIRECTORY%\fcstm-gui-acceptance.json" copy /Y "%RUN_DIRECTORY%\fcstm-gui-acceptance.json" "%RESULT_DRIVE%\fcstm-gui-acceptance.json" >nul 2>&1

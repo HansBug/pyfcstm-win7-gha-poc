@@ -58,6 +58,7 @@ if ($null -eq $windowProcess) {
 "window_handle=$($windowProcess.MainWindowHandle)" | Add-Content -Path $session -Encoding ASCII
 "window_title=$($windowProcess.MainWindowTitle)" | Add-Content -Path $session -Encoding ASCII
 & cmd.exe /c "echo GUI_VISIBLE>COM1"
+Start-Sleep -Seconds 10
 & (Join-Path $RunDirectory "capture-desktop.ps1") -Path $visible -MetadataPath $visibleMetadata
 
 $completed = $process.WaitForExit($timeoutSeconds * 1000)
@@ -66,6 +67,7 @@ if (-not $completed) {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
     exit 21
 }
+$process.Refresh()
 $exitCode = $process.ExitCode
 "acceptance_exit_code=$exitCode" | Add-Content -Path $session -Encoding ASCII
 & (Join-Path $RunDirectory "capture-desktop.ps1") -Path $after -MetadataPath $afterMetadata
