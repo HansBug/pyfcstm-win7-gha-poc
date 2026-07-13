@@ -41,12 +41,12 @@ if not defined PAYLOAD_DRIVE (
 )
 
 if not exist "%RUN_DIRECTORY%\ucrt-installed.txt" (
-    if not exist "%PAYLOAD_DRIVE%\win7-ucrt.msu" (
+    if not exist "%PAYLOAD_DRIVE%\win7-ucrt.cab" (
         set "FAILURE=Windows 7 UCRT update was not found"
         goto :finish
     )
-    > "%RUN_DIRECTORY%\ucrt-install.log" echo Installing the Windows 7 UCRT MSU with Windows Update Standalone Installer.
-    wusa.exe "%PAYLOAD_DRIVE%\win7-ucrt.msu" /quiet /norestart >> "%RUN_DIRECTORY%\ucrt-install.log" 2>&1
+    > "%RUN_DIRECTORY%\ucrt-install.log" echo Installing the Windows 7 UCRT CAB with the Win7 servicing stack.
+    dism.exe /online /add-package /packagepath:"%PAYLOAD_DRIVE%\win7-ucrt.cab" /quiet /norestart >> "%RUN_DIRECTORY%\ucrt-install.log" 2>&1
     if errorlevel 3010 goto :schedule-ucrt-reboot
     if errorlevel 1 (
         set "FAILURE=Windows 7 UCRT update failed"

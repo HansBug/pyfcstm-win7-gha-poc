@@ -25,7 +25,7 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
     exit 64
 }
 
-for required_file in pyfcstm.exe smt-verify.fcstm build-metadata.txt win7-ucrt.msu; do
+for required_file in pyfcstm.exe smt-verify.fcstm build-metadata.txt win7-ucrt.cab; do
     [[ -f "$payload_directory/$required_file" ]] || {
         echo "payload is missing $required_file" >&2
         exit 66
@@ -48,7 +48,7 @@ cp "$repository_root/guest/verify-cli.cmd" "$staging_directory/verify-cli.cmd"
 cp "$payload_directory/pyfcstm.exe" "$staging_directory/pyfcstm.exe"
 cp "$payload_directory/smt-verify.fcstm" "$staging_directory/smt-verify.fcstm"
 cp "$payload_directory/build-metadata.txt" "$staging_directory/build-metadata.txt"
-cp "$payload_directory/win7-ucrt.msu" "$staging_directory/win7-ucrt.msu"
+cp "$payload_directory/win7-ucrt.cab" "$staging_directory/win7-ucrt.cab"
 
 mkdir -p "$(dirname "$output_iso")"
 xorriso -as mkisofs \

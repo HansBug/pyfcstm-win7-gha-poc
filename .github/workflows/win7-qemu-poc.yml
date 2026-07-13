@@ -352,14 +352,19 @@ jobs:
           expected_sha256="$(sha256sum build-payload/pyfcstm.exe | awk '{print toupper($1)}')"
           ucrt_zip="$work_dir/WindowsUCRT.zip"
           ucrt_directory="$work_dir/win7-ucrt"
+          ucrt_msu_directory="$work_dir/win7-ucrt-msu"
           curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
             --output "$ucrt_zip" \
             'https://download.microsoft.com/download/3/1/1/311c06c1-f162-405c-b538-d9dc3a4007d1/WindowsUCRT.zip'
           mkdir -p "$ucrt_directory"
           7z e -y "-o$ucrt_directory" "$ucrt_zip" 'Windows6.1-KB3118401-x64.msu' >/dev/null
-          cp "$ucrt_directory/Windows6.1-KB3118401-x64.msu" build-payload/win7-ucrt.msu
-          ucrt_sha256="$(sha256sum build-payload/win7-ucrt.msu | awk '{print toupper($1)}')"
-          printf 'win7_ucrt_msu_sha256=%s\n' "$ucrt_sha256" >> build-payload/build-metadata.txt
+          mkdir -p "$ucrt_msu_directory"
+          7z e -y "-o$ucrt_msu_directory" "$ucrt_directory/Windows6.1-KB3118401-x64.msu" '*.cab' >/dev/null
+          ucrt_cab="$ucrt_msu_directory/Windows6.1-KB3118401-x64.cab"
+          test -f "$ucrt_cab"
+          cp "$ucrt_cab" build-payload/win7-ucrt.cab
+          ucrt_sha256="$(sha256sum build-payload/win7-ucrt.cab | awk '{print toupper($1)}')"
+          printf 'win7_ucrt_cab_sha256=%s\n' "$ucrt_sha256" >> build-payload/build-metadata.txt
           bash scripts/build_payload_iso.sh build-payload "$work_dir/bootstrap.iso" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
           bash scripts/build_unattend_floppy.sh "$work_dir/unattend.img" "$WIN7_IMAGE_INDEX" "$WIN7_LOCALE"
           bash scripts/build_results_image.sh "$work_dir/win7-results.img"

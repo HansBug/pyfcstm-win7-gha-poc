@@ -16,8 +16,9 @@ The workflow uses only GitHub-hosted runners:
    while PyInstaller 5 and later list Windows 8 as the support floor.
    The workflow excludes the hosted runner's UCRT and `api-ms-win-*.dll`
    binaries from the one-file bundle, then places Microsoft's official
-   `Windows6.1-KB3118401-x64.msu` on the guest payload CD. The Win7 guest
-   installs that update with Win7's Windows Update Standalone Installer before
+   `Windows6.1-KB3118401-x64.cab` extracted from Microsoft's official MSU on
+   the guest payload CD. The Win7 guest installs that CAB with its servicing
+   stack before
    running the EXE; if Windows requests a reboot, a SYSTEM `schtasks` startup
    continuation completes the check after the reboot. This avoids shipping
    newer hosted-SDK forwarders, including the
