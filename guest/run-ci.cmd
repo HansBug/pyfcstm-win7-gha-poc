@@ -92,6 +92,6 @@ exit /b 0
 
 :schedule-ucrt-reboot
 copy /Y "%PAYLOAD_DRIVE%\run-ci.cmd" "%WINDIR%\Setup\Scripts\run-ci-resume.cmd" >nul
-schtasks /create /tn PyfcstmWin7Poc /tr "cmd.exe /c call %WINDIR%\Setup\Scripts\run-ci-resume.cmd" /sc onstart /ru SYSTEM /rl HIGHEST /f >nul
+schtasks /create /tn PyfcstmWin7Poc /tr "cmd.exe /c call %WINDIR%\Setup\Scripts\run-ci-resume.cmd" /sc onlogon /ru SYSTEM /rl HIGHEST /f >nul
 shutdown /r /t 0 /f
 exit /b 0

@@ -19,7 +19,7 @@ The workflow uses only GitHub-hosted runners:
    `Windows6.1-KB3118401-x64.cab` extracted from Microsoft's official MSU on
    the guest payload CD. The Win7 guest installs that CAB with its servicing
    stack before
-   running the EXE; if Windows requests a reboot, a SYSTEM `schtasks` startup
+   running the EXE; if Windows requests a reboot, a SYSTEM `schtasks` logon
    continuation completes the check after the reboot. This avoids shipping
    newer hosted-SDK forwarders, including the
    `CopyFile2` import that Windows 7 does not provide. The workflow still
