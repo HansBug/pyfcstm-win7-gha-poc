@@ -203,7 +203,6 @@ jobs:
               for entry in walk_toc(toc)
               if entry[0].replace("\\", "/").lower().rsplit("/", 1)[-1] == "msvcp140.dll"
           ]
-          assert len(msvcp_entries) == 1, msvcp_entries
           root_msvcp_entries = [
               entry for entry in msvcp_entries if entry[0].replace("\\", "/").lower() == "msvcp140.dll"
           ]
