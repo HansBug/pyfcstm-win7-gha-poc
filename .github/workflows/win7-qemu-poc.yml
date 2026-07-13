@@ -76,6 +76,10 @@ jobs:
             echo "QEMU_TIMEOUT_SECONDS must be a positive integer."
             exit 2
           }
+          (( QEMU_TIMEOUT_SECONDS <= 21600 )) || {
+            echo "QEMU_TIMEOUT_SECONDS must not exceed 21600 seconds (6 hours)."
+            exit 2
+          }
 
   build-pyfcstm:
     name: Build pyfcstm main on Windows 2022
@@ -397,6 +401,7 @@ jobs:
     name: Boot Windows 7 SP1 and execute both built products
     needs: [validate-licensed-media, build-pyfcstm, build-fcstm-gui]
     runs-on: ubuntu-24.04
+    timeout-minutes: 360
     env:
       WIN7_ISO_URL: ${{ inputs.win7_iso_url || secrets.WIN7_ISO_URL }}
       WIN7_ISO_SHA256: ${{ inputs.win7_iso_sha256 || secrets.WIN7_ISO_SHA256 }}
@@ -444,6 +449,10 @@ jobs:
             echo "QEMU_TIMEOUT_SECONDS must be a positive integer."
             exit 2
           }
+          (( QEMU_TIMEOUT_SECONDS <= 21600 )) || {
+            echo "QEMU_TIMEOUT_SECONDS must not exceed 21600 seconds (6 hours)."
+            exit 2
+          }
 
       - name: Install QEMU and FAT-image tooling
         shell: bash
@@ -453,20 +462,23 @@ jobs:
           sudo apt-get install --yes --no-install-recommends \
             ca-certificates curl dosfstools mtools netcat-openbsd p7zip-full qemu-system-x86 qemu-utils wimtools xorriso
 
-      - name: Require KVM on the GitHub-hosted runner
+      - name: Probe optional KVM acceleration
         shell: bash
         run: |
           set -euo pipefail
-          test -e /dev/kvm || {
-            echo "The selected GitHub-hosted runner does not expose /dev/kvm."
-            exit 1
-          }
-          if ! test -r /dev/kvm || ! test -w /dev/kvm; then
-            sudo chmod 0666 /dev/kvm
+          if test -e /dev/kvm; then
+            if ! test -r /dev/kvm || ! test -w /dev/kvm; then
+              sudo chmod 0666 /dev/kvm
+            fi
+            if test -r /dev/kvm && test -w /dev/kvm; then
+              echo "KVM is available; QEMU will use KVM when the launch probe succeeds."
+            else
+              echo "KVM exists but is inaccessible; QEMU will use the TCG fallback."
+            fi
+          else
+            echo "KVM is unavailable; QEMU will use the TCG fallback."
           fi
-          test -r /dev/kvm
-          test -w /dev/kvm
-          ls -l /dev/kvm
+          test -e /dev/kvm && ls -l /dev/kvm || true
           qemu-system-x86_64 --version
 
       - name: Download and verify the licensed Windows 7 ISO
@@ -554,7 +566,8 @@ jobs:
             "${{ steps.media.outputs.results_image }}" \
             "${{ steps.media.outputs.pyfcstm_sha256 }}" \
             "${{ steps.media.outputs.fcstm_gui_sha256 }}" \
-            guest-evidence
+            guest-evidence \
+            "${{ steps.media.outputs.work_dir }}"
 
       - name: Upload non-redistributable verification evidence
         if: always()
@@ -564,6 +577,9 @@ jobs:
           path: |
             ${{ runner.temp }}/win7-poc/serial.log
             ${{ runner.temp }}/win7-poc/qemu-screen.ppm
+            ${{ runner.temp }}/win7-poc/qemu-screens
+            ${{ runner.temp }}/win7-poc/qemu.stderr.log
+            ${{ runner.temp }}/win7-poc/qemu-acceleration.txt
             ${{ runner.temp }}/win7-poc/qemu-exit-status.txt
             ${{ runner.temp }}/win7-poc/win7-results.img
             ${{ steps.media.outputs.image_info }}

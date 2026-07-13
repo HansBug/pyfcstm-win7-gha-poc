@@ -6,6 +6,8 @@ set "PAYLOAD_DRIVE="
 set "RESULT_DRIVE="
 set "STATUS=FAIL"
 set "FAILURE=unknown"
+set "GUI_TASK=PyfcstmWin7Gui"
+set "RESUME_TASK=PyfcstmWin7PocResume"
 
 mkdir "%RUN_DIRECTORY%" >nul 2>&1
 for %%D in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
@@ -37,6 +39,29 @@ if not defined RESULT_DRIVE goto :shutdown
 > "%RESULT_DRIVE%\run-ci-started.txt" echo started
 if not defined PAYLOAD_DRIVE (
     set "FAILURE=bootstrap payload CD was not found"
+    goto :finish
+)
+
+copy /Y "%PAYLOAD_DRIVE%\run-gui-ci.cmd" "%RUN_DIRECTORY%\run-gui-ci.cmd" >nul
+copy /Y "%PAYLOAD_DRIVE%\run-gui-acceptance.ps1" "%RUN_DIRECTORY%\run-gui-acceptance.ps1" >nul
+copy /Y "%PAYLOAD_DRIVE%\capture-desktop.ps1" "%RUN_DIRECTORY%\capture-desktop.ps1" >nul
+if not exist "%RUN_DIRECTORY%\run-gui-ci.cmd" (
+    set "FAILURE=interactive GUI runner copy failed"
+    goto :finish
+)
+if not exist "%RUN_DIRECTORY%\run-gui-acceptance.ps1" (
+    set "FAILURE=interactive GUI PowerShell runner copy failed"
+    goto :finish
+)
+if not exist "%RUN_DIRECTORY%\capture-desktop.ps1" (
+    set "FAILURE=desktop capture script copy failed"
+    goto :finish
+)
+
+schtasks /delete /tn %GUI_TASK% /f >nul 2>&1
+schtasks /create /tn %GUI_TASK% /tr "cmd.exe /c call %RUN_DIRECTORY%\run-gui-ci.cmd" /sc onlogon /ru ci /rp win7-poc-ephemeral /it /rl LIMITED /f > "%RUN_DIRECTORY%\gui-task-create.log" 2>&1
+if errorlevel 1 (
+    set "FAILURE=interactive GUI task registration failed"
     goto :finish
 )
 
@@ -88,6 +113,22 @@ if errorlevel 1 (
 set "STATUS=PASS"
 set "FAILURE="
 
+> "%RUN_DIRECTORY%\system-stage.txt" echo PASS
+> "%RESULT_DRIVE%\system-stage.txt" echo PASS
+> "%RESULT_DRIVE%\result.txt" echo RUNNING
+> "%RESULT_DRIVE%\failure.txt" echo interactive GUI stage pending
+copy /Y "%RUN_DIRECTORY%\gui-task-create.log" "%RESULT_DRIVE%\gui-task-create.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\pyfcstm-verify.log" "%RESULT_DRIVE%\pyfcstm-verify.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\pyfcstm-self-check.txt" "%RESULT_DRIVE%\pyfcstm-self-check.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\pyfcstm-self-check-commands.log" "%RESULT_DRIVE%\pyfcstm-self-check-commands.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\fcstm-gui-self-check.log" "%RESULT_DRIVE%\fcstm-gui-self-check.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\fcstm-gui-self-check.json" "%RESULT_DRIVE%\fcstm-gui-self-check.json" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\java-version-guest.txt" "%RESULT_DRIVE%\java-version-guest.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\build-metadata.txt" "%RESULT_DRIVE%\build-metadata.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\fcstm-gui-build-metadata.txt" "%RESULT_DRIVE%\fcstm-gui-build-metadata.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\ucrt-install.log" "%RESULT_DRIVE%\ucrt-install.log" >nul 2>&1
+exit /b 0
+
 :finish
 > "%RESULT_DRIVE%\result.txt" echo %STATUS%
 > "%RESULT_DRIVE%\failure.txt" echo %FAILURE%
@@ -110,7 +151,9 @@ copy /Y "%RUN_DIRECTORY%\java-version-guest.txt" "%RESULT_DRIVE%\java-version-gu
 copy /Y "%RUN_DIRECTORY%\build-metadata.txt" "%RESULT_DRIVE%\build-metadata.txt" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\fcstm-gui-build-metadata.txt" "%RESULT_DRIVE%\fcstm-gui-build-metadata.txt" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\ucrt-install.log" "%RESULT_DRIVE%\ucrt-install.log" >nul 2>&1
-schtasks /delete /tn PyfcstmWin7Poc /f >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\gui-task-create.log" "%RESULT_DRIVE%\gui-task-create.log" >nul 2>&1
+schtasks /delete /tn %GUI_TASK% /f >nul 2>&1
+schtasks /delete /tn %RESUME_TASK% /f >nul 2>&1
 
 :shutdown
 shutdown /s /t 0 /f
@@ -118,6 +161,6 @@ exit /b 0
 
 :schedule-ucrt-reboot
 copy /Y "%PAYLOAD_DRIVE%\run-ci.cmd" "%WINDIR%\Setup\Scripts\run-ci-resume.cmd" >nul
-schtasks /create /tn PyfcstmWin7Poc /tr "cmd.exe /c call %WINDIR%\Setup\Scripts\run-ci-resume.cmd" /sc onlogon /ru SYSTEM /rl HIGHEST /f >nul
+schtasks /create /tn %RESUME_TASK% /tr "cmd.exe /c call %WINDIR%\Setup\Scripts\run-ci-resume.cmd" /sc onlogon /ru SYSTEM /rl HIGHEST /f >nul
 shutdown /r /t 0 /f
 exit /b 0
