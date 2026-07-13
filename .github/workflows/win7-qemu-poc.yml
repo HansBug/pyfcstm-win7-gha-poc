@@ -119,15 +119,6 @@ jobs:
             (Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio'),
             (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio')
           ) | Where-Object { Test-Path $_ }
-          $msvcp = $visualStudioRoots |
-            ForEach-Object { Get-ChildItem -Path $_ -Filter msvcp140.dll -File -Recurse } |
-            Where-Object {
-              $_.FullName -match '\\VC\\Redist\\MSVC\\.+\\x64\\Microsoft\.VC\d+\.CRT\\msvcp140\.dll$'
-            } |
-            Select-Object -First 1
-          if (-not $msvcp) {
-            throw 'Could not locate MSVCP140.dll in the x64 Visual C++ Redist.'
-          }
           $vcruntime = $visualStudioRoots |
             ForEach-Object { Get-ChildItem -Path $_ -Filter vcruntime140_1.dll -File -Recurse } |
             Where-Object {
@@ -137,7 +128,6 @@ jobs:
           if (-not $vcruntime) {
             throw 'Could not locate VCRUNTIME140_1.dll in the x64 Visual C++ Redist.'
           }
-          "WIN7_MSVCP140_FILE=$($msvcp.FullName)" >> $env:GITHUB_ENV
           "WIN7_VCRUNTIME140_1_FILE=$($vcruntime.FullName)" >> $env:GITHUB_ENV
 
       - name: Build Windows 7-compatible standalone CLI from pyfcstm main
@@ -157,14 +147,11 @@ jobs:
           python -m tools.generate_spec -o pyfcstm.spec --icon-dir build/icons
           python "$GITHUB_WORKSPACE/scripts/remove_win7_ucrt_binaries.py" pyfcstm.spec
           python "$GITHUB_WORKSPACE/scripts/add_win7_redist_binary.py" \
-            pyfcstm.spec "$WIN7_MSVCP140_FILE"
-          python "$GITHUB_WORKSPACE/scripts/add_win7_redist_binary.py" \
             pyfcstm.spec "$WIN7_VCRUNTIME140_1_FILE"
           pyinstaller pyfcstm.spec
           pyi-archive_viewer -l dist/pyfcstm.exe > build/pyi-archive.txt
           ! grep -qi 'api-ms-win-' build/pyi-archive.txt
           ! grep -qi 'ucrtbase.dll' build/pyi-archive.txt
-          grep -qi 'msvcp140.dll' build/pyi-archive.txt
           grep -qi 'vcruntime140_1.dll' build/pyi-archive.txt
           grep -q 'pyfcstm.png' build/pyi-archive.txt
           python - <<'PY'
@@ -191,14 +178,16 @@ jobs:
           )
 
           msvcp_entries = [
-              entry for entry in walk_toc(toc) if entry[0].lower() == "msvcp140.dll"
+              entry
+              for entry in walk_toc(toc)
+              if entry[0].replace("\\", "/").lower().rsplit("/", 1)[-1] == "msvcp140.dll"
           ]
           assert len(msvcp_entries) == 1, msvcp_entries
           msvcp_source = msvcp_entries[0][1].replace("\\", "/").lower()
           print("msvcp140.dll source:", msvcp_source)
-          assert "/microsoft visual studio/" in msvcp_source, msvcp_source
-          assert "/vc/redist/msvc/" in msvcp_source, msvcp_source
-          assert msvcp_source.endswith("/msvcp140.dll"), msvcp_source
+          # The current VS 2022 redist imports Win10-only CopyFile2.  Keep the
+          # z3 wheel's compatible runtime instead of injecting that host copy.
+          assert "/microsoft visual studio/" not in msvcp_source, msvcp_source
 
           vcruntime_entries = [
               entry for entry in walk_toc(toc) if entry[0].lower() == "vcruntime140_1.dll"
