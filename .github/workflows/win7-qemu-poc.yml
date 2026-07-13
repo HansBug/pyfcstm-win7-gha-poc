@@ -167,7 +167,9 @@ jobs:
           pyinstaller pyfcstm.spec
           built_exe="$(find dist -maxdepth 1 -type f -iname 'pyfcstm*.exe' -print -quit)"
           test -n "$built_exe"
-          cp "$built_exe" dist/pyfcstm.exe
+          if [[ "$built_exe" != "dist/pyfcstm.exe" ]]; then
+            cp "$built_exe" dist/pyfcstm.exe
+          fi
           pyi-archive_viewer -l dist/pyfcstm.exe > build/pyi-archive.txt
           ! grep -qi 'api-ms-win-' build/pyi-archive.txt
           ! grep -qi 'ucrtbase.dll' build/pyi-archive.txt
