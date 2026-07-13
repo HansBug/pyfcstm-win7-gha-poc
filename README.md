@@ -17,11 +17,67 @@ The current gate validates two products:
 | `pyfcstm.exe` | `HansBug/pyfcstm@main` | guest CLI self-check (`15/15`), artifact hash |
 | `fcstm-gui.exe` | `zhougut/fcstm-gui@main` | `--self-check --json-report`, `182/182`, artifact hash |
 
+## Start Here
+
+This is a reusable, orchestration-only compatibility gate. It does not copy
+upstream source into this repository. Each run checks out the requested
+revision into a temporary runner directory, builds it, boots a clean Windows 7
+guest, and compares guest evidence with the build metadata.
+
+### Five-minute run
+
+1. Create a public GitHub repository from this repository, or use the existing
+   `HansBug/pyfcstm-win7-gha-poc` repository.
+2. Add an authorized Windows 7 SP1 x64 ISO URL and its SHA-256 as the
+   `WIN7_ISO_URL` and `WIN7_ISO_SHA256` Actions secrets. Use an Actions
+   variable named `WIN7_IMAGE_INDEX` for the `install.wim` edition index and
+   optionally set `WIN7_LOCALE` (`en-US` or `zh-CN`).
+3. Open **Actions -> Verify pyfcstm and fcstm-gui on Windows 7 SP1 -> Run
+   workflow**. Leave `pyfcstm_ref` as `main` for the current baseline.
+4. Wait for all four jobs to finish. The last job must be green; a green hosted
+   build without a green guest/evidence job is not a compatibility result.
+5. Download `win7-verification-evidence` and inspect the files listed in
+   [Evidence and Reproduction](#evidence-and-reproduction).
+
+The equivalent CLI flow is:
+
+```bash
+gh workflow run win7-qemu-poc.yml \
+  --repo HansBug/pyfcstm-win7-gha-poc \
+  --ref main \
+  -f pyfcstm_ref=main
+gh run list --repo HansBug/pyfcstm-win7-gha-poc \
+  --workflow win7-qemu-poc.yml --limit 5
+gh run watch RUN_ID --repo HansBug/pyfcstm-win7-gha-poc \
+  --interval 20 --exit-status
+gh run download RUN_ID --repo HansBug/pyfcstm-win7-gha-poc \
+  --name win7-verification-evidence --dir evidence
+```
+
+Do not put private ISO URLs, product keys, access tokens, or ISO digests in
+workflow source or shell history. Use repository secrets and verify the
+downloaded bytes before relying on any result.
+
+### Acceptance result at a glance
+
+The run is accepted only when all of these conditions hold in the same run:
+
+| Layer | Required evidence |
+| --- | --- |
+| Source provenance | Build metadata records the resolved upstream commit and selected ref |
+| Hosted build | `windows-2022` build succeeds and host smoke checks pass |
+| Guest OS | `Windows 7`, version `6.1.7601`, SP1, x64, `ProductType=1` |
+| Guest execution | QEMU exits `0`; both products run with the guest NIC disabled |
+| CLI contract | `pyfcstm-self-check.txt`: `total=15`, `passed=15`, `failed=0`, `status=passed` |
+| GUI contract | JSON report: `status=passed`, `passed=182`, `failed=0` |
+| Provenance link | Guest SHA-256 values equal the hashes from the corresponding hosted build jobs |
+| Collector gate | `scripts/collect_win7_results.sh` exits `0`; the final workflow job is green |
+
 ## Verified Baseline
 
 The latest complete two-product verification is run
 [`29239888742`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29239888742),
-from PoC commit `1df3056`.
+from PoC commit `1df30562db3c3d94fefdf7fef1e1cfd2138691c2`.
 
 | Check | Result |
 | --- | --- |
@@ -34,11 +90,12 @@ from PoC commit `1df3056`.
 | `pyfcstm` source commit | `971687ca5649cd01bf00239179e38ffda8b5e838` |
 | `pyfcstm` SHA-256 | `75506CA2EEB1B3B9DC69BD661C3D82F0828EC09080F0DEF3487B3E5DEA86F3A8` |
 | `pyfcstm` guest self-check | `15/15`, `failed=0` |
+| `fcstm-gui` source ref | `main` |
 | `fcstm-gui` source commit | `62546ad6fa74d700a4cdc5697ee03daa37e1b21a` |
 | `fcstm-gui` source self-check | `182/182`, `failed=0` |
 | `fcstm-gui` onefile self-check | `182/182`, `failed=0` |
 | `fcstm-gui` guest self-check | `182/182`, `failed=0` |
-| `fcstm-gui` SHA-256 | `90DBA66AB9BB115010815037323E0B9EE0C6A6CFD04F782B4E6C799F21435799` |
+| `fcstm-gui` SHA-256 | `8D8FA8915649CD9224DA4D08380FFF5474873767941F2BE2C50FE79D49C72FFF` |
 
 The run publishes these artifacts:
 
@@ -66,32 +123,91 @@ down-level UCRT update `KB3118401` before executing the products.
 
 ```mermaid
 flowchart TD
-    A[workflow_dispatch / repository_dispatch / weekly schedule] --> B[Validate ISO URL, SHA-256, image index, locale]
-    B --> C1[windows-2022: checkout pyfcstm ref]
-    B --> C2[windows-2022: checkout fcstm-gui main]
-    C1 --> D1[Python 3.7 + PyInstaller 4.10]
-    D1 --> E1[Generate spec and apply Win7 runtime policy]
-    E1 --> F1[Build pyfcstm.exe and host CLI smoke]
-    F1 --> G1[Upload pyfcstm payload]
-    C2 --> D2[Python 3.7 + Java 11 + MSYS2 Cairo]
-    D2 --> E2[make ui + documented PyInstaller build]
-    E2 --> F2[Source and onefile self-check: 182/182]
-    F2 --> G2[jlink portable Java + upload GUI payload]
-    G1 --> H[ubuntu-24.04: download and hash-check licensed ISO]
+    A[Manual dispatch, repository dispatch, or weekly schedule] --> B{Media settings valid?}
+    B -- no --> Z1[Fail before any build]
+    B -- yes --> C
+
+    subgraph HOST_WINDOWS[GitHub-hosted windows-2022 jobs]
+        C[Checkout orchestration repo only]
+        C --> C1[Checkout HansBug/pyfcstm at ref input]
+        C --> C2[Checkout zhougut/fcstm-gui main]
+        C1 --> D1[Python 3.7 + PyInstaller 4.10]
+        D1 --> E1[Generate spec; remove UCRT/API-set forwarders]
+        E1 --> F1[Inject Win7-compatible redist; build pyfcstm.exe]
+        F1 --> G1[Host CLI smoke + build metadata + SHA-256]
+        C2 --> D2[Python 3.7 + Java 11 + MSYS2 Cairo]
+        D2 --> E2[make ui + documented PyInstaller build]
+        E2 --> F2[Source and onefile GUI self-check: 182/182]
+        F2 --> G2[jlink Java + GUI metadata + SHA-256]
+    end
+
+    subgraph HOST_LINUX[GitHub-hosted ubuntu-24.04 job]
+        H[Download licensed ISO and verify SHA-256]
+        H --> I[Inspect install.wim edition and x64 architecture]
+        I --> J[Build payload ISO, unattended floppy, FAT result image]
+        J --> K[Require /dev/kvm and launch QEMU]
+    end
+
+    G1 --> H
     G2 --> H
-    H --> I[Build payload ISO, unattended floppy, and FAT result image]
-    I --> J[QEMU/KVM boots fresh Windows 7 SP1 x64]
-    J --> K[SetupComplete hook finds payload CD and result disk]
-    K --> L[Install KB3118401; reboot via SYSTEM task if requested]
-    L --> M[Copy EXEs, DLL, Java runtime, fixture, and metadata]
-    M --> N[verify-cli.cmd: 15-check pyfcstm CLI self-check]
-    N --> O[verify-gui.cmd: GUI --self-check --json-report]
-    O --> P[Write PASS, OS data, hashes, logs, and reports to FAT image]
-    P --> Q[Host extracts evidence and enforces all assertions]
+
+    subgraph GUEST[Fresh Windows 7 SP1 x64 QEMU guest]
+        K --> L[Unattended Setup + SetupComplete hook]
+        L --> M[Locate payload CD and result disk]
+        M --> N[Install KB3118401 UCRT; reboot via SYSTEM task if needed]
+        N --> O[Copy EXEs, DLLs, Java, fixture, metadata]
+        O --> P[verify-cli.cmd: 15 CLI checks]
+        P --> Q[verify-gui.cmd: GUI --self-check --json-report]
+        Q --> R[Write result, OS data, hashes, logs, reports]
+        R --> S[Disable network; shut down guest]
+    end
+
+    S --> T[ubuntu-24.04 extracts FAT image with mtools]
+    T --> U{OS, reports, hashes, and QEMU status valid?}
+    U -- no --> Z2[Fail final gate; retain evidence artifact]
+    U -- yes --> Z3[Pass; publish hash-linked evidence]
 ```
 
 The authoritative implementation is
 [`.github/workflows/win7-qemu-poc.yml`](.github/workflows/win7-qemu-poc.yml).
+
+### Ownership boundaries
+
+The repository is deliberately split into three trust and execution domains:
+
+| Domain | Runner or machine | Owns | Must never contain |
+| --- | --- | --- | --- |
+| Orchestration | GitHub repository | Workflow YAML, guest scripts, image builders, evidence rules | Upstream source, ISO bytes, product keys, long-lived binaries |
+| Hosted build | `windows-2022` | Temporary checkout, toolchain setup, executable build, host preflight, provenance metadata | A claim that the binary works on Windows 7 |
+| Compatibility guest | Win7 SP1 QEMU guest launched by `ubuntu-24.04` | Actual loader/runtime behavior and offline product self-checks | Network access or uploaded system disks |
+
+The boundary is important: a Windows 2022 smoke test proves that the artifact
+was produced, while only the guest result proves that the artifact loaded and
+ran under Windows 7. Hashes are the link between the two domains. The host
+collector rejects a result when the guest hash, source metadata, OS report, or
+self-check report is missing or inconsistent.
+
+### File-to-stage map
+
+| Path | Responsibility | When to change it |
+| --- | --- | --- |
+| `.github/workflows/win7-qemu-poc.yml` | Job graph, runner labels, inputs, artifact wiring, final gate | Adding a product, changing a toolchain, or changing a workflow trigger |
+| `guest/Autounattend.xml` | Unattended Windows Setup answer file | Changing the guest edition, locale, disk layout, or setup phase |
+| `guest/install-hook.cmd` | Installs the SetupComplete hook from the payload | Changing when the test starts during Windows Setup |
+| `guest/run-ci.cmd` | Guest bootstrap, UCRT servicing, file copy, verifier execution, result writing, shutdown | Changing guest lifecycle or runtime dependencies |
+| `guest/verify-cli.cmd` | Machine-readable pyfcstm CLI contract | Changing CLI commands or accepted diagnostics |
+| `guest/verify-gui.cmd` | GUI onefile self-check contract | Changing GUI runtime checks |
+| `scripts/build_payload_iso.sh` | Packages only the files needed by the guest | Adding a payload dependency or verifier asset |
+| `scripts/build_unattend_floppy.sh` | Creates the unattended boot floppy | Changing Setup automation inputs |
+| `scripts/build_results_image.sh` | Creates the small FAT evidence disk | Changing evidence capacity or volume label |
+| `scripts/run_win7_qemu.sh` | Launches and times out QEMU/KVM | Changing virtual hardware, acceleration, or timeout behavior |
+| `scripts/collect_win7_results.sh` | Extracts evidence and fails closed | Changing acceptance criteria or report schema |
+| `scripts/*py` | Build-time compatibility policy and PyInstaller helpers | Only when the upstream/toolchain incompatibility is understood and tested |
+| `README.md` / `CLAUDE.md` | Human-facing contract and maintainer policy | Whenever workflow behavior, evidence, or sources change |
+
+When adding a new product, copy the data flow rather than bypassing it: build
+metadata and a SHA-256 digest must be produced on the hosted runner, the guest
+must run a stable verifier, and the collector must compare the two reports.
 
 ### Phase 1: Workflow selection and media validation
 
@@ -179,6 +295,35 @@ interactive login.
 The guest has no network. `QT_QPA_PLATFORM=offscreen` is set for the GUI
 self-check, testing executable/runtime behavior rather than a particular GPU.
 
+#### CLI self-check contract
+
+`guest/verify-cli.cmd` is intentionally independent of the upstream Python
+test suite. It exercises the packaged executable directly, so the test remains
+valid even when the source checkout is deleted after the hosted build. The 15
+checks are:
+
+| # | Check | Assertion |
+| ---: | --- | --- |
+| 1 | Version | `pyfcstm.exe -v` exits `0` and identifies pyfcstm |
+| 2 | Help | top-level help exposes the expected commands |
+| 3 | PlantUML | output file exists and contains `@startuml` / `@enduml` |
+| 4 | JSON inspect | JSON output exists and contains `root_state_path` |
+| 5 | Built-in template | Python template emits `machine.py` and `README.md` |
+| 6 | Simulator help | simulator help and `--no-color` are available |
+| 7 | Current state | batch simulator command reports the initial state |
+| 8 | Cycle | one cycle completes and reports cycle/state output |
+| 9 | Multiple commands | semicolon-separated batch commands complete |
+| 10 | History | history command completes after multiple cycles |
+| 11 | Settings | settings commands complete successfully |
+| 12 | Clear | reset/clear returns the simulator to its initial state |
+| 13 | No-color | non-interactive no-color mode exits successfully |
+| 14 | Invalid input | a missing DSL file returns a non-zero status |
+| 15 | Invalid command | an unknown simulator command fails or emits an explicit error |
+
+The verifier writes a line for every check before writing the summary. A
+missing, duplicated, or partially written report is rejected by the host
+collector; it is not treated as a partial pass.
+
 ### Phase 6: Host evidence enforcement
 
 [`scripts/collect_win7_results.sh`](scripts/collect_win7_results.sh) mounts the
@@ -207,12 +352,34 @@ archive. Retired labels such as `windows-7`, `windows-10`, `ubuntu-18.04`, or
 environments. GitHub may retire or migrate images, so the run metadata and
 evidence artifact always record the actual labels and tool versions used.
 
+The runner decision is deliberate:
+
+| Requirement | Decision | Why |
+| --- | --- | --- |
+| Build a Windows executable | `windows-2022` hosted runner | Current supported Windows image with the required MSYS2, Python, and Visual Studio tooling |
+| Build the Linux/QEMU harness | `ubuntu-24.04` hosted runner | Current supported Ubuntu image with QEMU, `mtools`, `wimtools`, and KVM access |
+| Reproduce an old Linux userspace | Optional container or a real QEMU guest | A container changes userspace but shares the host kernel; only a guest proves the old kernel/OS |
+| Reproduce Windows 7 | Real Windows 7 guest under QEMU/KVM | No supported `windows-7` hosted label exists; Windows containers share or constrain host kernel versions |
+| Keep the workflow free to run long term | Public repository + standard hosted labels | Standard hosted runners are free for public repositories; avoids self-hosted hardware and paid larger-runner custom images |
+
+GitHub's hosted-runner documentation explicitly says that nested
+virtualization is technically possible but unsupported. This repository treats
+QEMU/KVM as an experimental, evidence-producing compatibility gate: the final
+job requires `/dev/kvm`, records QEMU's exit status, preserves a screenshot and
+result image, and fails closed if any guest assertion is missing. The workflow
+does not claim that GitHub provides a supported Win7 runner.
+
 This design keeps the repository within the requested hosted-runner model. It
 does not require a self-hosted Windows machine or a permanently maintained
-Windows 7 VM. Public repositories may have hosted-runner minute allowances,
-but they are still subject to GitHub account, concurrency, storage, and usage
-limits; see the [GitHub Actions limits](https://docs.github.com/en/actions/reference/limits)
-documentation before treating the weekly schedule as unlimited capacity.
+Windows 7 VM. Standard GitHub-hosted runners are free for public repositories,
+but workflows are still subject to account, concurrency, storage,
+artifact-retention, and service limits. Review the [GitHub Actions billing
+documentation](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/about-billing-for-github-actions)
+and [GitHub-hosted runner
+documentation](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners)
+and [GitHub Actions limits](https://docs.github.com/en/actions/reference/limits)
+before treating the weekly schedule as unlimited capacity. A standard hosted
+runner is not a promise that a retired image label will remain available.
 
 ### Linux old-version builds
 
@@ -254,7 +421,7 @@ Configure these repository settings before dispatching:
 
 The dispatch form can temporarily override URL, digest, image index, locale,
 QEMU timeout, and `pyfcstm_ref` without changing saved settings. The default
-`pyfcstm_ref` defaults to `main`.
+`pyfcstm_ref` is `main`.
 
 ### Manual dispatch with `gh`
 
@@ -276,7 +443,12 @@ run time; no source is copied into this repository.
 ### Windows 7 ISO availability URLs
 
 The primary ISO URL is intentionally stored in the `WIN7_ISO_URL` secret and
-is not printed in logs. The current content-addressed public fallback set is:
+is not printed in logs. The current content-addressed public fallback set,
+recorded from the successful baseline run, is:
+
+```text
+CID: bafybeiefkfbbmwcdhuuva34ufircuc4w266gmdvv4ojakxqeqp5o4vc3wy
+```
 
 | URL | Role |
 | --- | --- |
@@ -285,10 +457,41 @@ is not printed in logs. The current content-addressed public fallback set is:
 | `https://gateway.ipfs.io/ipfs/bafybeiefkfbbmwcdhuuva34ufircuc4w266gmdvv4ojakxqeqp5o4vc3wy` | Equivalent IPFS gateway |
 | `https://ipfs.filebase.io/ipfs/bafybeiefkfbbmwcdhuuva34ufircuc4w266gmdvv4ojakxqeqp5o4vc3wy` | Equivalent IPFS gateway |
 
-These URLs are availability sources, not license grants. The CID, configured
-`WIN7_ISO_SHA256`, and selected `install.wim` index must agree. A URL serving
-different bytes is rejected. The repository owner is responsible for confirming
-that the selected Windows media is licensed for the intended use.
+These URLs are availability sources, not license grants or Microsoft-hosted
+distribution channels. Public gateways can disappear, throttle, or return an
+error; keep at least one authorized source in `WIN7_ISO_URL` and use the
+fallback list only for identical bytes. The repository owner is responsible for
+confirming that the selected Windows media is licensed for the intended use.
+
+#### ISO verification procedure
+
+Never trust a filename, mirror description, or gateway alone. Download to a
+temporary directory, compute the digest, and inspect the WIM before placing the
+URL and digest in Actions settings:
+
+```bash
+url='https://ipfs.io/ipfs/bafybeiefkfbbmwcdhuuva34ufircuc4w266gmdvv4ojakxqeqp5o4vc3wy'
+curl --fail --location --retry 5 --output /tmp/windows7.iso "$url"
+sha256sum /tmp/windows7.iso
+7z l /tmp/windows7.iso | sed -n '1,80p'
+```
+
+The printed digest must equal the secret `WIN7_ISO_SHA256`. The workflow then
+extracts `sources/install.wim`, runs `wiminfo`, and rejects the image unless the
+selected index is Windows 7 SP1 x64. For this repository's baseline, index `1`
+is Windows 7 Home Basic, build `7601`, architecture `x86_64`, with `zh-CN` as
+the image language. A different edition or language is valid only if its WIM
+metadata and expected guest assertions are updated together.
+
+#### Official Microsoft and licensing references
+
+Microsoft's old [Windows 7 software download page](https://www.microsoft.com/en-us/software-download/windows7)
+now redirects to the general software-download catalog and does not provide a
+stable anonymous Windows 7 ISO URL. The [Windows 7 lifecycle page](https://learn.microsoft.com/en-us/lifecycle/products/windows-7)
+records the end of support. Obtain media through a valid product, volume
+licensing, MSDN, or organizational portal entitlement, then use this gate only
+to validate the bytes you are authorized to use. Do not infer licensing from an
+IPFS CID or from this repository.
 
 ### Microsoft UCRT source
 
@@ -374,6 +577,28 @@ Use the existing path as a reusable template:
 9. Update the README product table, Mermaid diagram, evidence schema, URLs, and references together.
 10. Run a full guest verification before claiming support.
 
+Before editing the workflow, write down this product record. It prevents a
+new target from accidentally inheriting pyfcstm-specific assumptions:
+
+| Field | Example for a new product |
+| --- | --- |
+| Upstream source | Repository, ref, and resolved commit recorded in metadata |
+| Build job | Hosted runner label, language/tool versions, and build command |
+| Artifact closure | Executable plus every DLL, data file, font, JVM, or interpreter needed offline |
+| Host preflight | Fast command that proves the build artifact is structurally complete |
+| Guest command | Exact command or verifier script run inside the old OS |
+| Report schema | Stable text/JSON fields for total, passed, failed, and status |
+| Hash link | Build-side digest and guest-side digest compared by the collector |
+| OS assertion | Caption, version, architecture, service pack, and any required update |
+| Failure evidence | Logs, screenshot, result disk, and a clear failure reason |
+| Retention | Short-lived artifacts only; no system disk or installer media upload |
+
+The implementation order should follow the dependency direction: build and
+metadata first, payload packaging second, guest verifier third, collector
+assertions fourth, documentation and a full run last. Do not add a collector
+assertion that the guest never writes, and do not make a guest report depend on
+files that are absent from the payload.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Investigation |
@@ -387,6 +612,10 @@ Use the existing path as a reusable template:
 | GUI self-check fails only in guest | Missing Java, Qt/Cairo dependency, or Win7 loader issue | Read guest GUI log, Java version, OS report, and hashes together |
 | `PASS` but collector fails | Missing evidence, malformed JSON, or hash mismatch | Treat collector failure as authoritative |
 | QEMU timeout | Slow setup, missing KVM, or guest did not shut down | Check `/dev/kvm`, screenshots, timeout, and preserved evidence |
+| Guest CLI report has duplicate totals or skipped labels | Win7 `cmd.exe` batch control-flow behavior | Keep `guest/verify-cli.cmd` linear; do not reintroduce label subroutine calls |
+| Guest starts but a DLL entry point is missing | Hosted SDK/UCRT binary leaked into the bundle | Inspect the archive and use an app-local compatible runtime only when documented |
+| UCRT install requests a reboot | DISM returned `3010` | Let `run-ci.cmd` register its SYSTEM resume task; do not run the verifier before servicing completes |
+| ISO URL works locally but workflow cannot download it | Gateway throttling, range-request behavior, or an expired URL | Add an identical-byte fallback and re-check the configured digest |
 
 Do not fix a compatibility failure by removing the guest assertion. A green
 workflow with weak evidence is worse than a red workflow with a precise reason.
@@ -437,7 +666,64 @@ test "$(readlink AGENTS.md)" = CLAUDE.md
 For changes to the guest or evidence collector, dispatch the complete workflow
 and attach the successful run URL to the review or release note.
 
+## Maintainer Acceptance Checklist
+
+Use this checklist for every new software project or compatibility change:
+
+- [ ] The orchestration repository contains no upstream source, ISO, product
+      key, QCOW2 disk, UCRT CAB, or unbounded downloaded artifact.
+- [ ] The workflow checks out the upstream repository and records the resolved
+      commit, ref, tool versions, and build hash.
+- [ ] The build runs on a current standard hosted runner and has a small host
+      smoke test that does not masquerade as old-OS evidence.
+- [ ] Every runtime dependency needed by the guest is explicitly copied into
+      the payload and explained in a script comment and this README.
+- [ ] The guest verifier is deterministic, offline, exits non-zero on a
+      failed assertion, and writes a machine-readable report.
+- [ ] The guest writes OS identity, result status, hashes, logs, and report
+      files to the result image before shutdown.
+- [ ] The host collector compares guest hashes to build metadata and fails
+      closed on missing, duplicated, malformed, or partial reports.
+- [ ] The full workflow passes once after the change; local YAML/Bash/Python
+      checks are not a substitute for the guest run.
+- [ ] `README.md` records the new run URL, upstream commit, source URL, and
+      any changed acceptance assumptions.
+- [ ] `CLAUDE.md` remains the single guidance file and `AGENTS.md` remains a
+      symlink to it.
+
+For a release or external acceptance report, archive the run URL and the
+`win7-verification-evidence` artifact together. Never claim compatibility from
+an uploaded executable without the same-run guest report and hash comparison.
+
 ## References
+
+### Research notes and decision record
+
+The following sources were consulted while designing this gate. The conclusions
+are recorded here so a future maintainer can re-check the assumptions instead
+of treating them as folklore. Links are official documentation or the exact
+upstream repositories used by the workflow; availability and policy can change,
+so re-read them when GitHub changes runner generations. The last research pass
+was checked on `2026-07-13`.
+
+| Topic | Source | Practical conclusion used here |
+| --- | --- | --- |
+| Hosted runner model and maintenance | [GitHub-hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) | Runners are disposable VMs, images are maintained by GitHub, and nested virtualization is technically possible but explicitly unsupported |
+| Available image labels and support window | [`actions/runner-images`](https://github.com/actions/runner-images#available-images), [image support policy](https://github.com/actions/runner-images#software-and-image-support) | YAML labels identify maintained image generations; the project supports the latest two OS versions and retires older images |
+| Public-repository pricing | [GitHub Actions billing](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/about-billing-for-github-actions) | Standard hosted runners are free for public repositories; larger runners and storage have different billing rules |
+| Cross-repository checkout | [`actions/checkout` README](https://github.com/actions/checkout#checkout-multiple-repos-private) | `repository`, `ref`, and `path` allow the orchestration repository to build upstream source without vendoring it |
+| Full-system compatibility testing | [QEMU system emulation](https://www.qemu.org/docs/master/system/introduction.html) | QEMU models a complete machine; KVM accelerates execution when `/dev/kvm` is available |
+| Windows containers | [Windows container version compatibility](https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/version-compatibility) | Windows user/kernel version matching constrains container images; a Windows 2022 container is not Windows 7 evidence |
+| Universal CRT deployment | [Universal CRT deployment](https://learn.microsoft.com/en-us/cpp/windows/universal-crt-deployment?view=msvc-170) | UCRT is an OS component on newer Windows and can be centrally deployed to older supported systems |
+| Microsoft redistributable files | [Windows SDK redist lists](https://learn.microsoft.com/en-us/legal/windows-sdk/redist) | `Windows6.1-KB3118401-x64.msu` is a Microsoft-listed UCRT package; the workflow downloads it at run time and never commits it |
+| PyInstaller compatibility | [PyInstaller 4.10 requirements](https://pyinstaller.org/en/v4.10/requirements.html) | The selected PyInstaller generation documents Windows 7 support and is pinned in the hosted build |
+| Windows 7 lifecycle | [Windows 7 lifecycle](https://learn.microsoft.com/en-us/lifecycle/products/windows-7) | Windows 7 is out of support; this gate is a compatibility experiment, not a security-support claim |
+
+The investigation also considered `ubuntu:18.04`/`ubuntu:20.04` containers for
+old Linux builds. They can provide an older userspace and glibc, but share the
+host kernel; use a real QEMU guest when kernel behavior is part of the claim.
+Likewise, a retired `windows-7` or `windows-10` hosted label cannot be restored
+by changing YAML, and a Windows container cannot supply a Windows 7 kernel.
 
 ### GitHub Actions and artifacts
 

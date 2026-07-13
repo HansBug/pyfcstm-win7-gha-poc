@@ -19,6 +19,50 @@ The repository must not contain:
 Upstream source is checked out at workflow runtime into `_source/<project>`.
 Keep that boundary intact when changing the workflow.
 
+## Source-of-Truth Map
+
+Use the files for these distinct purposes:
+
+| File | Authority |
+| --- | --- |
+| `README.md` | Operator guide: setup, workflow phases, ISO sources, evidence schema, research references, and reproduction commands |
+| `CLAUDE.md` | Maintainer policy: invariants, review gates, security boundaries, and change discipline |
+| `AGENTS.md` | Compatibility discovery name only; it must remain a symlink to `CLAUDE.md` |
+| `.github/workflows/win7-qemu-poc.yml` | Executable job graph and input defaults |
+| `guest/*.cmd` | Code that actually runs inside Windows 7 |
+| `scripts/collect_win7_results.sh` | Final host-side acceptance gate |
+
+When behavior changes, update the executable workflow/scripts first, then
+update `README.md` and this policy if the contract or maintenance procedure
+changed. Do not copy the same long narrative into both guidance files.
+
+## Maintainer Quick Start
+
+From a clean checkout of this repository:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+import yaml
+yaml.safe_load(Path('.github/workflows/win7-qemu-poc.yml').read_text())
+print('workflow YAML: ok')
+PY
+bash -n scripts/*.sh
+python -m py_compile scripts/*.py
+rm -rf scripts/__pycache__
+git diff --check
+test "$(readlink AGENTS.md)" = CLAUDE.md
+```
+
+For a guest-affecting change, the only sufficient validation is a fresh full
+workflow run. Download the same-run `win7-verification-evidence` artifact and
+inspect `result.txt`, `os.txt`, both hashes, both self-check reports, build
+metadata, and `qemu-exit-status.txt` before updating the README baseline.
+
+For a documentation-only change, the local checks above still catch broken
+workflow syntax and symlink drift. Keep the Mermaid flow, ISO URLs, licensing
+warnings, and evidence requirements synchronized with the actual workflow.
+
 ## Non-Negotiable Acceptance Contract
 
 Every full verification must prove all of the following in one run:
@@ -104,6 +148,12 @@ test "$(readlink AGENTS.md)" = CLAUDE.md
 For a full gate change, dispatch the workflow, wait for all jobs to finish,
 download `win7-verification-evidence`, and record the run URL in the review or
 release note. Inspect JSON counts rather than relying on a screenshot.
+
+Before calling a run a baseline, record all of the following from that same
+run: the workflow URL and PoC commit, upstream refs and resolved commits,
+runner labels, guest OS/version/architecture, UCRT package digest, QEMU exit
+status, executable hashes, CLI/GUI report counts, and artifact retention. A
+partial report or a manually copied executable is not a baseline.
 
 ## Safe Git and GitHub Operations
 
