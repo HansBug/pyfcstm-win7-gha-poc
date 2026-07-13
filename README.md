@@ -14,19 +14,17 @@ The workflow uses only GitHub-hosted runners:
    Windows standalone build path with Python 3.7. The PoC pins
    `PyInstaller==4.10`: its documentation still says Windows 7 should work,
    while PyInstaller 5 and later list Windows 8 as the support floor.
-   The packaged app-local Universal CRT contains `ucrtbase.dll`,
-   `vcruntime140.dll`, and the required `api-ms-win-*.dll` API-set forwarders
-   extracted from Microsoft's Win7-compatible `WindowsUCRT.zip` package. It also bundles a required
-   `MSVCP140.dll` from the hosted runner's Visual C++ Redist directory. This
-   follows Microsoft's documented app-local deployment model for legacy
-   Windows, while acknowledging that central Redist installation is preferred
-   for normal end-user deployments.
-   The workflow rebuilds PyInstaller's binary cache with the x64 UCRT from the
-   hosted runner's Windows SDK `Redist` directory, then asserts that the
-   generated `PKG-00.toc` selected that redistributable for both
-   `ucrtbase.dll` and `api-ms-win-core-localization-l1-2-0.dll`. This keeps the
-   Windows 7 UCRT distribution in the one-file executable without storing a
-   runtime DLL in this repository.
+   The workflow downloads Microsoft's official Windows 10 SDK 10.0.10240
+   installer, installs only its Windows SDK feature into the ephemeral runner,
+   and uses that SDK's `Redist\\ucrt\\DLLs\\x64` directory. This is important:
+   the current hosted Windows SDK contains newer API-set forwarders, including
+   a `CopyFile2` import that Windows 7 does not provide. The workflow rejects
+   that import before packaging and asserts in `PKG-00.toc` that `ucrtbase.dll`
+   and the API-set forwarders came from the legacy SDK path. It also bundles
+   required `MSVCP140.dll` and `VCRUNTIME140_1.dll` files from the hosted
+   runner's Visual C++ Redist directory. This follows Microsoft's documented
+   app-local deployment model for legacy Windows, while acknowledging that
+   central Redist installation is preferred for normal end-user deployments.
 2. `ubuntu-24.04` requires `/dev/kvm`, installs QEMU, and creates an empty
    Windows 7 virtual disk for this run.
 3. QEMU boots a real Windows 7 SP1 x64 installation from an authorized ISO.
@@ -122,3 +120,12 @@ the documented support floor for that release is Windows 8, so a build that
 succeeds on Windows 2022 cannot establish Windows 7 compatibility by itself.
 For comparison, [PyInstaller 4.10 requirements](https://pyinstaller.org/en/v4.10/requirements.html)
 state that Windows 7 should work, although it was not a supported platform.
+
+The SDK/UCRT selection follows Microsoft's [Universal CRT deployment
+guidance](https://learn.microsoft.com/en-us/cpp/windows/universal-crt-deployment?view=msvc-170),
+which identifies `Windows Kits\\10\\Redist\\ucrt\\DLLs` as the app-local source
+and recommends shipping the complete API-set forwarder set. The legacy SDK
+installer is the official 10.0.10240 standalone download linked by Microsoft's
+[Windows SDK archive](https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads-archive).
+The workflow does not commit or cache Microsoft binaries in this repository;
+each Windows build obtains them on the ephemeral GitHub-hosted runner.
