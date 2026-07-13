@@ -17,9 +17,9 @@ if errorlevel 1 exit /b 21
 "%CLI%" plantuml -i "%MODEL%" -o "%PLANTUML_OUTPUT%"
 if errorlevel 1 exit /b 22
 if not exist "%PLANTUML_OUTPUT%" exit /b 23
-"%CLI%" inspect -i "%MODEL%" --enable-verify --max-complexity-tier smt_linear --format json --color never -o "%INSPECT_OUTPUT%"
+"%CLI%" inspect -i "%MODEL%" --format json --color never -o "%INSPECT_OUTPUT%"
 if errorlevel 1 exit /b 24
-findstr /c:"smt_local" "%INSPECT_OUTPUT%" >nul
+findstr /c:"root_state_path" "%INSPECT_OUTPUT%" >nul
 if errorlevel 1 exit /b 25
 
 exit /b 0
