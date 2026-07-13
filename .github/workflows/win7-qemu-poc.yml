@@ -107,6 +107,38 @@ jobs:
         shell: bash
         run: echo "${{ steps.msys2.outputs.msys2-location }}\\mingw64\\bin" >> "$GITHUB_PATH"
 
+      - name: Prepare the Windows 7 Universal CRT update
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'win7-ucrt'
+          $zip = Join-Path $env:RUNNER_TEMP 'WindowsUCRT.zip'
+          $url = 'https://download.microsoft.com/download/3/1/1/311c06c1-f162-405c-b538-d9dc3a4007d1/WindowsUCRT.zip'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
+          Expand-Archive -Force -Path $zip -DestinationPath $root
+          $msu = Get-ChildItem -Path $root -Filter 'Windows6.1-KB3118401-x64.msu' -Recurse |
+            Select-Object -First 1
+          if (-not $msu) {
+            throw 'The official Windows 7 x64 UCRT MSU was not found in WindowsUCRT.zip.'
+          }
+          $msuRoot = Join-Path $root 'msu'
+          $cabRoot = Join-Path $root 'cab'
+          New-Item -ItemType Directory -Force -Path $msuRoot, $cabRoot | Out-Null
+          & "$env:ProgramFiles\7-Zip\7z.exe" x -y $msu.FullName "-o$msuRoot" | Out-Null
+          $cab = Get-ChildItem -Path $msuRoot -Filter '*.cab' -Recurse | Select-Object -First 1
+          if (-not $cab) {
+            throw 'The Windows 7 UCRT MSU did not contain a CAB payload.'
+          }
+          & "$env:ProgramFiles\7-Zip\7z.exe" x -y $cab.FullName "-o$cabRoot" | Out-Null
+          $ucrt = Get-ChildItem -Path $cabRoot -Filter ucrtbase.dll -Recurse |
+            Select-Object -First 1
+          $localization = Get-ChildItem -Path $cabRoot -Filter api-ms-win-core-localization-l1-2-0.dll -Recurse |
+            Select-Object -First 1
+          if (-not $ucrt -or -not $localization) {
+            throw 'The Windows 7 UCRT CAB did not contain the required UCRT/API-set files.'
+          }
+          "WIN7_UCRT_DIRECTORY=$($ucrt.DirectoryName)" >> $env:GITHUB_ENV
+
       - name: Set up Python 3.7
         uses: actions/setup-python@v6
         with:
@@ -115,13 +147,6 @@ jobs:
       - name: Select Windows 7 app-local runtime files
         shell: pwsh
         run: |
-          $redist = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Redist'
-          $ucrt = Get-ChildItem -Path $redist -Filter ucrtbase.dll -Recurse |
-            Where-Object { $_.DirectoryName -match '\\ucrt\\DLLs\\x64$' } |
-            Select-Object -First 1
-          if (-not $ucrt) {
-            throw 'Could not locate the x64 UCRT redistributable in the Windows SDK.'
-          }
           $visualStudioRoots = @(
             (Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio'),
             (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio')
@@ -144,7 +169,6 @@ jobs:
           if (-not $vcruntime) {
             throw 'Could not locate VCRUNTIME140_1.dll in the x64 Visual C++ Redist.'
           }
-          "WIN7_UCRT_DIRECTORY=$($ucrt.DirectoryName)" >> $env:GITHUB_ENV
           "WIN7_MSVCP140_FILE=$($msvcp.FullName)" >> $env:GITHUB_ENV
           "WIN7_VCRUNTIME140_1_FILE=$($vcruntime.FullName)" >> $env:GITHUB_ENV
 
@@ -198,7 +222,7 @@ jobs:
               assert len(entries) == 1, entries
               source = entries[0][1].replace("\\", "/").lower()
               print(f"{filename} source:", source)
-              assert "/windows kits/10/redist/" in source, source
+              assert "/win7-ucrt/" in source, source
               assert source.endswith(f"/ucrt/dlls/x64/{filename}"), source
 
           sdk_redist_source("ucrtbase.dll")
