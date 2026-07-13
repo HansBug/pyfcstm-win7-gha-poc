@@ -102,6 +102,8 @@ set "FAILURE="
 certutil -hashfile "%RUN_DIRECTORY%\pyfcstm.exe" SHA256 > "%RESULT_DRIVE%\hash.txt" 2>&1
 certutil -hashfile "%RUN_DIRECTORY%\fcstm-gui.exe" SHA256 > "%RESULT_DRIVE%\fcstm-gui-hash.txt" 2>&1
 copy /Y "%RUN_DIRECTORY%\pyfcstm-verify.log" "%RESULT_DRIVE%\pyfcstm-verify.log" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\pyfcstm-self-check.txt" "%RESULT_DRIVE%\pyfcstm-self-check.txt" >nul 2>&1
+copy /Y "%RUN_DIRECTORY%\pyfcstm-self-check-commands.log" "%RESULT_DRIVE%\pyfcstm-self-check-commands.log" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\fcstm-gui-self-check.log" "%RESULT_DRIVE%\fcstm-gui-self-check.log" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\fcstm-gui-self-check.json" "%RESULT_DRIVE%\fcstm-gui-self-check.json" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\java-version-guest.txt" "%RESULT_DRIVE%\java-version-guest.txt" >nul 2>&1

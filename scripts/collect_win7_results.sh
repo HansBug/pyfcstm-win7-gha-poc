@@ -45,7 +45,7 @@ for evidence_file in result.txt failure.txt os.txt hash.txt; do
     normalize_text_file "$output_directory/$evidence_file"
 done
 
-for evidence_file in fcstm-gui-hash.txt pyfcstm-verify.log fcstm-gui-self-check.log \
+for evidence_file in fcstm-gui-hash.txt pyfcstm-verify.log pyfcstm-self-check.txt pyfcstm-self-check-commands.log fcstm-gui-self-check.log \
     fcstm-gui-self-check.json java-version-guest.txt build-metadata.txt \
     fcstm-gui-build-metadata.txt ucrt-install.log; do
     if mcopy -o -i "$results_volume" "::$evidence_file" "$output_directory/$evidence_file"; then
@@ -64,6 +64,27 @@ grep -Fx 'BuildNumber=7601' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ServicePackMajorVersion=1' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ProductType=1' "$output_directory/os.txt" >/dev/null
 grep -E '^OSArchitecture=(64-bit|64 位)' "$output_directory/os.txt" >/dev/null
+
+[[ -f "$output_directory/pyfcstm-self-check.txt" ]] || {
+    echo "guest pyfcstm self-check report is missing" >&2
+    exit 1
+}
+grep -Fx 'status=passed' "$output_directory/pyfcstm-self-check.txt" >/dev/null || {
+    echo "guest pyfcstm self-check report was not passed" >&2
+    exit 1
+}
+grep -Fx 'total=15' "$output_directory/pyfcstm-self-check.txt" >/dev/null || {
+    echo "guest pyfcstm self-check report did not contain 15 checks" >&2
+    exit 1
+}
+grep -Fx 'passed=15' "$output_directory/pyfcstm-self-check.txt" >/dev/null || {
+    echo "guest pyfcstm self-check report did not contain 15 passed checks" >&2
+    exit 1
+}
+grep -Fx 'failed=0' "$output_directory/pyfcstm-self-check.txt" >/dev/null || {
+    echo "guest pyfcstm self-check report contained failed checks" >&2
+    exit 1
+}
 
 extract_sha256() {
     local report=$1
@@ -116,4 +137,5 @@ grep -F '"passed": 182' "$output_directory/fcstm-gui-self-check.json" >/dev/null
 }
 
 printf 'Windows 7 SP1 guest passed. pyfcstm SHA-256: %s\n' "$actual_pyfcstm_sha256"
+printf 'Windows 7 SP1 guest passed. pyfcstm self-check: 15/15\n'
 printf 'Windows 7 SP1 guest passed. fcstm-gui SHA-256: %s\n' "$actual_fcstm_gui_sha256"

@@ -14,7 +14,7 @@ The current gate validates two products:
 
 | Product | Upstream checkout | Guest assertion |
 | --- | --- | --- |
-| `pyfcstm.exe` | `HansBug/pyfcstm@dev/s714-acceptance-artifacts` | CLI version/help, PlantUML generation, JSON inspect, artifact hash |
+| `pyfcstm.exe` | `HansBug/pyfcstm@dev/s714-acceptance-artifacts` | guest CLI self-check (`15/15`), artifact hash |
 | `fcstm-gui.exe` | `zhougut/fcstm-gui@main` | `--self-check --json-report`, `182/182`, artifact hash |
 
 ## Verified Baseline
@@ -32,6 +32,7 @@ from PoC commit `f5220d44cdb1b8a1f894ad8b8ec0a6bf7b4ef2b3`.
 | Guest result | `PASS` |
 | `pyfcstm` source commit | `f142a656df43e0b80ed6b7ac63b0696345325646` |
 | `pyfcstm` SHA-256 | `067754472F45016FBE9EFEF891A60ACDFC9C90DBE245186E49DD17582DE45669` |
+| `pyfcstm` guest self-check | Added after this baseline; the next successful run must report `15/15`, `failed=0` |
 | `fcstm-gui` source commit | `62546ad6fa74d700a4cdc5697ee03daa37e1b21a` |
 | `fcstm-gui` source self-check | `182/182`, `failed=0` |
 | `fcstm-gui` onefile self-check | `182/182`, `failed=0` |
@@ -42,7 +43,7 @@ The run publishes these artifacts:
 
 - `pyfcstm-win7-payload` - CLI executable, DSL fixture, and build metadata.
 - `fcstm-gui-win7-payload` - GUI executable, portable Java runtime, self-check reports, and build metadata.
-- `win7-verification-evidence` - guest OS information, result status, hashes, logs, self-check JSON, Java version, and QEMU files.
+- `win7-verification-evidence` - guest OS information, result status, hashes, CLI/GUI self-check reports, Java version, and QEMU files.
 
 Build payloads are retained for 14 days. Verification evidence is retained for
 30 days. The ISO and guest system disk are never uploaded.
@@ -82,7 +83,7 @@ flowchart TD
     J --> K[SetupComplete hook finds payload CD and result disk]
     K --> L[Install KB3118401; reboot via SYSTEM task if requested]
     L --> M[Copy EXEs, DLL, Java runtime, fixture, and metadata]
-    M --> N[verify-cli.cmd: version/help/PlantUML/JSON inspect]
+    M --> N[verify-cli.cmd: 15-check pyfcstm CLI self-check]
     N --> O[verify-gui.cmd: GUI --self-check --json-report]
     O --> P[Write PASS, OS data, hashes, logs, and reports to FAT image]
     P --> Q[Host extracts evidence and enforces all assertions]
@@ -170,7 +171,7 @@ interactive login.
 1. Locates the payload CD and result disk.
 2. Installs the UCRT CAB; if DISM requests reboot, registers a SYSTEM logon task and resumes automatically.
 3. Copies both executables, fixture, `vcruntime140_1.dll`, metadata, and Java to `C:\pyfcstm-win7-poc`.
-4. Runs [`guest/verify-cli.cmd`](guest/verify-cli.cmd), then [`guest/verify-gui.cmd`](guest/verify-gui.cmd).
+4. Runs [`guest/verify-cli.cmd`](guest/verify-cli.cmd), which executes 15 CLI checks and writes `pyfcstm-self-check.txt`, then runs [`guest/verify-gui.cmd`](guest/verify-gui.cmd).
 5. Writes `PASS`/`FAIL`, OS properties, hashes, logs, and reports to the FAT result disk.
 6. Shuts down the guest for host extraction.
 
@@ -187,6 +188,7 @@ FAT image read-only through `mtools` and fails closed unless:
 - version is `6.1.7601`, build is `7601`, service pack is `1`;
 - product type is `1` and architecture is `64-bit`;
 - both guest hashes equal the Windows build artifact hashes;
+- `pyfcstm-self-check.txt` exists with `total=15`, `passed=15`, `failed=0`, and `status=passed`;
 - GUI JSON exists with `"status": "passed"`, `"passed": 182`, and zero failures;
 - guest Java version and required logs exist.
 
@@ -330,7 +332,8 @@ Important evidence files:
 | `result.txt` / `failure.txt` | Guest status and failure reason |
 | `os.txt` | Caption, version, build, service pack, product type, architecture |
 | `hash.txt` / `fcstm-gui-hash.txt` | Windows `certutil` hashes |
-| `pyfcstm-verify.log` | CLI smoke output |
+| `pyfcstm-self-check.txt` | Machine-readable 15-check CLI guest contract |
+| `pyfcstm-verify.log` / `pyfcstm-self-check-commands.log` | CLI self-check output and command transcripts |
 | `fcstm-gui-self-check.json` / `.log` | Machine-readable and human-readable guest self-check |
 | `java-version-guest.txt` | Java runtime used by the GUI |
 | `build-metadata.txt` files | Source revisions, tool versions, expected hashes |

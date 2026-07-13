@@ -29,7 +29,7 @@ Every full verification must prove all of the following in one run:
 4. The GUI source and onefile self-checks passed before upload.
 5. A fresh Windows 7 SP1 x64 guest booted under QEMU/KVM on `ubuntu-24.04`.
 6. The guest installed the documented UCRT compatibility update and ran offline.
-7. Both products ran inside the guest; the GUI report says `status=passed`, `passed=182`, and `failed=0`.
+7. Both products ran inside the guest; the CLI report says `status=passed`, `total=15`, `passed=15`, and `failed=0`, while the GUI report says `status=passed`, `passed=182`, and `failed=0`.
 8. Guest hashes match the hashes recorded by the Windows build jobs.
 9. The host evidence collector passed OS, result, hash, report, and artifact-presence checks.
 
@@ -56,6 +56,7 @@ host build log copied from an earlier run. Before reporting success, inspect:
 - `result.txt`, `failure.txt`, and `os.txt`;
 - `hash.txt` and `fcstm-gui-hash.txt`;
 - `pyfcstm-verify.log`;
+- `pyfcstm-self-check.txt`;
 - `fcstm-gui-self-check.json` and `.log`;
 - `java-version-guest.txt`;
 - both build metadata files;
