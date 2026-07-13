@@ -17,7 +17,8 @@ The workflow uses only GitHub-hosted runners:
    The workflow excludes the hosted runner's UCRT and `api-ms-win-*.dll`
    binaries from the one-file bundle, then places Microsoft's official
    `Windows6.1-KB3118401-x64.msu` on the guest payload CD. The Win7 guest
-   installs that update offline with DISM before running the EXE; if Windows
+   installs that update with Win7's Windows Update Standalone Installer before
+   running the EXE; if Windows
    requests a reboot, a `RunOnce` continuation completes the check after the
    reboot. This avoids shipping newer hosted-SDK forwarders, including the
    `CopyFile2` import that Windows 7 does not provide. The workflow still
