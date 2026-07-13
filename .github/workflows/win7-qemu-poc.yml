@@ -165,7 +165,7 @@ jobs:
           python "$GITHUB_WORKSPACE/scripts/add_win7_redist_binary.py" \
             pyfcstm.spec "$WIN7_VCRUNTIME140_1_FILE"
           pyinstaller pyfcstm.spec
-          built_exe="$(find dist -maxdepth 1 -type f -iname 'pyfcstm-*.exe' -print -quit)"
+          built_exe="$(find dist -maxdepth 1 -type f -iname 'pyfcstm*.exe' -print -quit)"
           test -n "$built_exe"
           cp "$built_exe" dist/pyfcstm.exe
           pyi-archive_viewer -l dist/pyfcstm.exe > build/pyi-archive.txt
