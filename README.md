@@ -18,9 +18,9 @@ The workflow uses only GitHub-hosted runners:
    binaries from the one-file bundle, then places Microsoft's official
    `Windows6.1-KB3118401-x64.msu` on the guest payload CD. The Win7 guest
    installs that update with Win7's Windows Update Standalone Installer before
-   running the EXE; if Windows
-   requests a reboot, a `RunOnce` continuation completes the check after the
-   reboot. This avoids shipping newer hosted-SDK forwarders, including the
+   running the EXE; if Windows requests a reboot, a SYSTEM `schtasks` startup
+   continuation completes the check after the reboot. This avoids shipping
+   newer hosted-SDK forwarders, including the
    `CopyFile2` import that Windows 7 does not provide. The workflow still
    bundles required `MSVCP140.dll` and `VCRUNTIME140_1.dll` files from the
    hosted runner's Visual C++ Redist directory. Microsoft prefers central UCRT

@@ -84,6 +84,7 @@ set "FAILURE="
 certutil -hashfile "%RUN_DIRECTORY%\pyfcstm.exe" SHA256 > "%RESULT_DRIVE%\hash.txt" 2>&1
 copy /Y "%RUN_DIRECTORY%\verify-cli.log" "%RESULT_DRIVE%\verify-cli.log" >nul 2>&1
 copy /Y "%RUN_DIRECTORY%\ucrt-install.log" "%RESULT_DRIVE%\ucrt-install.log" >nul 2>&1
+schtasks /delete /tn PyfcstmWin7Poc /f >nul 2>&1
 
 :shutdown
 shutdown /s /t 0 /f
@@ -92,6 +93,6 @@ exit /b 0
 :schedule-ucrt-reboot
 > "%RUN_DIRECTORY%\ucrt-installed.txt" echo installed
 copy /Y "%PAYLOAD_DRIVE%\run-ci.cmd" "%WINDIR%\Setup\Scripts\run-ci-resume.cmd" >nul
-reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce" /v PyfcstmWin7Poc /t REG_SZ /d "cmd.exe /c call \"%WINDIR%\Setup\Scripts\run-ci-resume.cmd\"" /f >nul
+schtasks /create /tn PyfcstmWin7Poc /tr "cmd.exe /c call %WINDIR%\Setup\Scripts\run-ci-resume.cmd" /sc onstart /ru SYSTEM /rl HIGHEST /f >nul
 shutdown /r /t 0 /f
 exit /b 0
