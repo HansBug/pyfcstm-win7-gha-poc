@@ -69,6 +69,16 @@ if (-not $completed) {
 }
 $process.Refresh()
 $exitCode = $process.ExitCode
+"process_has_exited=$($process.HasExited)" | Add-Content -Path $session -Encoding ASCII
+if ($null -eq $exitCode -or "$exitCode" -eq "") {
+    # Windows PowerShell 2 can expose a completed Start-Process object without
+    # materializing ExitCode; the acceptance JSON is the authoritative result.
+    "process_exit_code_source=acceptance_report" | Add-Content -Path $session -Encoding ASCII
+    $exitCode = 1
+    if ((Test-Path $report) -and (Select-String -Path $report -SimpleMatch '"status": "passed"' -Quiet)) {
+        $exitCode = 0
+    }
+}
 "acceptance_exit_code=$exitCode" | Add-Content -Path $session -Encoding ASCII
 & (Join-Path $RunDirectory "capture-desktop.ps1") -Path $after -MetadataPath $afterMetadata
 & cmd.exe /c "echo GUI_AFTER>COM1"
