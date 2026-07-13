@@ -52,7 +52,20 @@ grep -Fx 'ServicePackMajorVersion=1' "$output_directory/os.txt" >/dev/null
 grep -Fx 'ProductType=1' "$output_directory/os.txt" >/dev/null
 grep -E '^OSArchitecture=(64-bit|64 位)' "$output_directory/os.txt" >/dev/null
 
-actual_exe_sha256=$(grep -Eio '[A-F0-9]{64}' "$output_directory/hash.txt" | head -n 1 | tr '[:lower:]' '[:upper:]')
+actual_exe_sha256=$(awk '
+    {
+        line = $0
+        gsub(/[^0-9A-Fa-f]/, "", line)
+        if (length(line) == 64) {
+            print toupper(line)
+            exit
+        }
+    }
+' "$output_directory/hash.txt")
+[[ "$actual_exe_sha256" =~ ^[A-F0-9]{64}$ ]] || {
+    echo "guest executable hash report did not contain a 256-bit digest" >&2
+    exit 1
+}
 [[ "$actual_exe_sha256" == "$expected_exe_sha256" ]] || {
     echo "guest executable hash did not match the Windows build artifact" >&2
     exit 1
