@@ -77,33 +77,43 @@ The run is accepted only when all of these conditions hold in the same run:
 
 ## Verified Baseline
 
-The latest complete two-product verification is run
-[`29239888742`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29239888742),
-from PoC commit `1df30562db3c3d94fefdf7fef1e1cfd2138691c2`.
+The latest complete two-product **interactive GUI** verification is run
+[`29262068162`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29262068162),
+from PoC commit `5943feaf86defe2db64ab1b3851539da9f9bc7f7`.
 
 | Check | Result |
 | --- | --- |
 | Windows build runner | `windows-2022` |
-| QEMU runner | `ubuntu-24.04` with `/dev/kvm` |
+| QEMU runner | `ubuntu-24.04` with `/dev/kvm`, recorded `mode=kvm` |
 | Guest | Windows 7 Home Basic, `6.1.7601`, SP1, x64, `ProductType=1` |
 | QEMU exit status | `0` |
 | Guest result | `PASS` |
 | `pyfcstm` source ref | `main` |
 | `pyfcstm` source commit | `971687ca5649cd01bf00239179e38ffda8b5e838` |
-| `pyfcstm` SHA-256 | `75506CA2EEB1B3B9DC69BD661C3D82F0828EC09080F0DEF3487B3E5DEA86F3A8` |
+| `pyfcstm` SHA-256 | `935706BB7E02852F7CFD2FF4DA1082143B327F848FDCC4011EC69383F16F9F4F` |
 | `pyfcstm` guest self-check | `15/15`, `failed=0` |
 | `fcstm-gui` source ref | `main` |
 | `fcstm-gui` source commit | `62546ad6fa74d700a4cdc5697ee03daa37e1b21a` |
 | `fcstm-gui` source self-check | `182/182`, `failed=0` |
 | `fcstm-gui` onefile self-check | `182/182`, `failed=0` |
 | `fcstm-gui` guest self-check | `182/182`, `failed=0` |
-| `fcstm-gui` SHA-256 | `8D8FA8915649CD9224DA4D08380FFF5474873767941F2BE2C50FE79D49C72FFF` |
+| `fcstm-gui` interactive acceptance | `140/140`, `failed=0`, Windows QPA, visible window |
+| `fcstm-gui` desktop evidence | 3 PNGs at `800x600`; 208 acceptance artifacts, 156 PNGs |
+| `fcstm-gui` SHA-256 | `A9F2B7AB69CA06ABA9E27567E5B617EBEDD7DA9D7AA765EB4764A2402FAA1B32` |
+| QEMU evidence | exit `0`, canonical PPM plus 8 periodic frames |
 
 The run publishes these artifacts:
 
 - `pyfcstm-win7-payload` - CLI executable, DSL fixture, and build metadata.
 - `fcstm-gui-win7-payload` - GUI executable, portable Java runtime, self-check reports, and build metadata.
 - `win7-verification-evidence` - guest OS information, result status, hashes, CLI/GUI self-check reports, Java version, interactive GUI screenshots/logs, per-case artifacts, and QEMU files.
+
+The final evidence artifact for this baseline is
+[`win7-verification-evidence` (8284743211)](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/artifacts/8284743211).
+The executable payload artifacts are
+[`pyfcstm-win7-payload` (8284140605)](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/artifacts/8284140605)
+and
+[`fcstm-gui-win7-payload` (8284225339)](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/artifacts/8284225339).
 
 Build payloads are retained for 14 days. Verification evidence is retained for
 30 days. The ISO and guest system disk are never uploaded.
@@ -113,13 +123,15 @@ Build payloads are retained for 14 days. Verification evidence is retained for
 The gate proves this concrete claim:
 
 > A particular upstream source revision can be built on a current free
-> GitHub-hosted runner and the resulting Windows executable can start and pass
-> its declared smoke/self-check contract inside a fresh Windows 7 SP1 x64 guest
-> with the documented UCRT compatibility update.
+> GitHub-hosted runner and the resulting Windows executables can start inside a
+> fresh Windows 7 SP1 x64 guest with the documented UCRT compatibility update.
+> The CLI passes its 15-check contract, and the GUI creates a real visible
+> window in an interactive session, completes the upstream `fcstm-gui`
+> 140-case acceptance corpus, and exports hash-linked screenshots and logs.
 
-It does **not** prove that every Windows 7 installation, third-party driver, or
-an unpatched Windows 7 image will work. The guest installs Microsoft's
-down-level UCRT update `KB3118401` before executing the products.
+It does **not** prove that every Windows 7 installation, third-party driver,
+GPU path, or an unpatched Windows 7 image will work. The guest installs
+Microsoft's down-level UCRT update `KB3118401` before executing the products.
 
 ## End-to-End Flow
 
@@ -290,9 +302,10 @@ interactive login.
 1. Locates the payload CD and result disk.
 2. Installs the UCRT CAB; if DISM requests reboot, registers a SYSTEM logon task and resumes automatically.
 3. Copies both executables, fixture, `vcruntime140_1.dll`, metadata, and Java to `C:\pyfcstm-win7-poc`.
-4. Runs [`guest/verify-cli.cmd`](guest/verify-cli.cmd), which executes 15 CLI checks and writes `pyfcstm-self-check.txt`, then runs [`guest/verify-gui.cmd`](guest/verify-gui.cmd).
-5. Writes `PASS`/`FAIL`, OS properties, hashes, logs, and reports to the FAT result disk.
-6. Shuts down the guest for host extraction.
+4. Runs [`guest/verify-cli.cmd`](guest/verify-cli.cmd), which executes 15 CLI checks and writes `pyfcstm-self-check.txt`, then runs [`guest/verify-gui.cmd`](guest/verify-gui.cmd) with the GUI's offscreen runtime contract.
+5. Registers [`guest/run-gui-ci.cmd`](guest/run-gui-ci.cmd) as an `/IT` `ONLOGON` task for the `ci` user. That task starts [`guest/run-gui-acceptance.ps1`](guest/run-gui-acceptance.ps1) with `QT_QPA_PLATFORM=windows`, waits for the real window, and captures desktop evidence.
+6. Writes `PASS`/`FAIL`, OS properties, hashes, GUI session metadata, screenshots, logs, JSON reports, and per-case artifacts to the FAT result disk.
+7. Shuts down the guest for host extraction.
 
 The guest has no network. `QT_QPA_PLATFORM=offscreen` is set for the GUI
 self-check, testing executable/runtime behavior rather than a particular GPU.
@@ -735,6 +748,12 @@ Use this checklist for every new software project or compatibility change:
       failed assertion, and writes a machine-readable report.
 - [ ] The guest writes OS identity, result status, hashes, logs, and report
       files to the result image before shutdown.
+- [ ] GUI runs in an existing interactive user session, records a non-zero
+      window handle, and captures before/during/after desktop screenshots.
+- [ ] GUI acceptance counts and every declared artifact are checked from the
+      JSON inventory; a headless self-check is not accepted as GUI evidence.
+- [ ] QEMU retains a canonical framebuffer screenshot even after graceful
+      guest shutdown, plus periodic frames and acceleration diagnostics.
 - [ ] The host collector compares guest hashes to build metadata and fails
       closed on missing, duplicated, malformed, or partial reports.
 - [ ] The full workflow passes once after the change; local YAML/Bash/Python
@@ -808,7 +827,8 @@ by changing YAML, and a Windows container cannot supply a Windows 7 kernel.
 
 ### Repository evidence
 
-- [Latest successful two-product run](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29239888742)
+- [Latest successful interactive two-product run](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29262068162)
+- [Interactive GUI evidence artifact](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/artifacts/8284743211)
 - [PoC workflow](.github/workflows/win7-qemu-poc.yml)
 - [Guest CLI verifier](guest/verify-cli.cmd)
 - [Guest GUI verifier](guest/verify-gui.cmd)
