@@ -23,9 +23,9 @@ if not exist "%MODEL%" exit /b 11
 call :check_version
 call :check_help
 call :check_plantuml
-call :check_inspect
+call :check_json_inspect
 call :check_builtin_template
-call :check_simulate_help
+call :check_sim_help
 call :check_simulate_current
 call :check_simulate_cycle
 call :check_simulate_multiple
@@ -102,7 +102,8 @@ findstr /C:"@enduml" "%PLANTUML_OUTPUT%" >nul
 if errorlevel 1 (call :record "plantuml generation" 1) else (call :record "plantuml generation" 0)
 exit /b 0
 
-:check_inspect
+:check_json_inspect
+>> "%LOG%" echo [json inspect]
 del /q "%INSPECT_OUTPUT%" >nul 2>&1
 "%CLI%" inspect -i "%MODEL%" --format json --color never -o "%INSPECT_OUTPUT%" > "%OUTPUT%" 2>&1
 set "RC=!ERRORLEVEL!"
@@ -123,7 +124,8 @@ if not exist "%GENERATED_DIRECTORY%\machine.py" (call :record "built-in python t
 if not exist "%GENERATED_DIRECTORY%\README.md" (call :record "built-in python template" 1) else (call :record "built-in python template" 0)
 exit /b 0
 
-:check_simulate_help
+:check_sim_help
+>> "%LOG%" echo [simulate help]
 "%CLI%" simulate -h > "%OUTPUT%" 2>&1
 set "RC=!ERRORLEVEL!"
 type "%OUTPUT%" >> "%LOG%"
