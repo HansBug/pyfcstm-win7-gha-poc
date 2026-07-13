@@ -113,18 +113,42 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP 'win7-ucrt'
           $sdkSetup = Join-Path $env:RUNNER_TEMP 'sdksetup-10240.exe'
           $sdkUrl = 'https://download.microsoft.com/download/E/1/F/E1F1E61E-F3C6-4420-A916-FB7C47FBC89E/standalonesdk/sdksetup.exe'
+          $sdkLayout = Join-Path $root 'layout'
           $sdkInstall = Join-Path $root 'sdk'
-          $sdkLog = Join-Path $root 'sdksetup.log'
+          $sdkLog = Join-Path $root 'sdksetup-layout.log'
           New-Item -ItemType Directory -Force -Path $root | Out-Null
           Invoke-WebRequest -UseBasicParsing -Uri $sdkUrl -OutFile $sdkSetup
           $arguments = @(
-            '/features', 'OptionId.WindowsSoftwareDevelopmentKit',
-            '/installpath', $sdkInstall,
+            '/layout', $sdkLayout,
             '/quiet', '/norestart', '/ceip', 'off', '/log', $sdkLog
           )
           $process = Start-Process -FilePath $sdkSetup -ArgumentList $arguments -Wait -PassThru
           if ($process.ExitCode -ne 0) {
-            throw "Windows SDK 10.0.10240 setup failed with exit code $($process.ExitCode). See $sdkLog."
+            if (Test-Path $sdkLog) {
+              Get-Content -Path $sdkLog -Tail 120
+            }
+            throw "Windows SDK 10.0.10240 layout failed with exit code $($process.ExitCode). See $sdkLog."
+          }
+          $ucrtMsi = Get-ChildItem -Path $sdkLayout -Filter 'Universal CRT Redistributable-x86_en-us.msi' -Recurse |
+            Select-Object -First 1
+          if (-not $ucrtMsi) {
+            throw 'The Windows SDK layout did not contain the official Universal CRT Redistributable MSI.'
+          }
+          New-Item -ItemType Directory -Force -Path $sdkInstall | Out-Null
+          $msiLog = Join-Path $root 'ucrt-msiexec.log'
+          $msiArguments = @(
+            '/a', $ucrtMsi.FullName,
+            '/qn', '/norestart',
+            "TARGETDIR=$sdkInstall",
+            "KITSROOT=$sdkInstall",
+            '/L*v', $msiLog
+          )
+          $msiProcess = Start-Process -FilePath "$env:WINDIR\System32\msiexec.exe" -ArgumentList $msiArguments -Wait -PassThru
+          if ($msiProcess.ExitCode -ne 0) {
+            if (Test-Path $msiLog) {
+              Get-Content -Path $msiLog -Tail 120
+            }
+            throw "The legacy SDK UCRT MSI extraction failed with exit code $($msiProcess.ExitCode). See $msiLog."
           }
           $ucrt = Join-Path $sdkInstall 'Redist\ucrt\DLLs\x64'
           $required = @(
