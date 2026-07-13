@@ -46,8 +46,14 @@ the 6.1 kernel family but is not Windows 7. Requiring a Windows 7 caption also
 prevents a componentized Embedded Standard 7 image from being labelled as a
 Windows 7 client result.
 
-Until a successful run has produced `win7-verification-evidence`, this
-repository must not describe any pyfcstm executable as "Verified on Win7".
+The first fully green end-to-end run is
+[`29225447512`](https://github.com/HansBug/pyfcstm-win7-gha-poc/actions/runs/29225447512).
+Its evidence reports Windows 7 Home Basic SP1 x64 (`6.1.7601`, product type
+1), a zero QEMU exit status, `result.txt=PASS`, and an executable hash matching
+the Windows build artifact. The guest CLI checks covered version/help,
+PlantUML generation, and SMT/Z3 inspection. Future runs must continue to
+publish `win7-verification-evidence` before a new build is described as
+verified.
 
 ## Required configuration
 
@@ -62,6 +68,13 @@ dispatching the workflow:
 | `WIN7_IMAGE_INDEX` | Actions variable | Positive `install.wim` image index for Windows 7 SP1 x64 |
 | `WIN7_LOCALE` | Actions variable | ISO UI language in the form `en-US` or `zh-CN`, defaults to `en-US` |
 | `WIN7_ISO_FALLBACK_URLS` | Actions variable | Optional newline-separated alternate URLs for the same hash-verified ISO |
+
+The current public fallback is the content-addressed IPFS URL
+`https://ipfs.io/ipfs/bafybeiefkfbbmwcdhuuva34ufircuc4w266gmdvv4ojakxqeqp5o4vc3wy`.
+The workflow also tries equivalent `dweb.link`, `gateway.ipfs.io`, and
+`ipfs.filebase.io` gateways. The URL is only an availability source: every
+run still requires the configured `WIN7_ISO_SHA256` and the repository owner's
+authorization to use the media.
 
 The `workflow_dispatch` form can temporarily replace the media URL, digest,
 image index, locale, and QEMU timeout. This is useful for testing a new
