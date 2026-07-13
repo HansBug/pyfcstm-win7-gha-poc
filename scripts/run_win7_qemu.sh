@@ -155,6 +155,19 @@ else
     set -e
 fi
 
+# A graceful guest shutdown can close QEMU's monitor before the final direct
+# screendump runs.  Preserve the newest periodic frame as the canonical host
+# screenshot so normal shutdowns retain the same visual evidence as timeouts.
+if [[ ! -s "$screenshot" ]]; then
+    shopt -s nullglob
+    qemu_frames=("$screen_directory"/frame-*.ppm)
+    if (( ${#qemu_frames[@]} > 0 )); then
+        latest_frame=${qemu_frames[${#qemu_frames[@]}-1]}
+        cp "$latest_frame" "$screenshot"
+    fi
+    shopt -u nullglob
+fi
+
 printf '%s\n' "$qemu_status" > "$exit_status_file"
 
 if [[ $qemu_status -eq 124 ]]; then

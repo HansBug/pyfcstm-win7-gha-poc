@@ -15,7 +15,7 @@ The current gate validates two products:
 | Product | Upstream checkout | Guest assertion |
 | --- | --- | --- |
 | `pyfcstm.exe` | `HansBug/pyfcstm@main` | guest CLI self-check (`15/15`), artifact hash |
-| `fcstm-gui.exe` | `zhougut/fcstm-gui@main` | `--self-check --json-report`, `182/182`, artifact hash |
+| `fcstm-gui.exe` | `zhougut/fcstm-gui@main` | visible GUI self-check (`182/182`), interactive acceptance (`140/140`), screenshots, artifact hash |
 
 ## Start Here
 
@@ -69,7 +69,9 @@ The run is accepted only when all of these conditions hold in the same run:
 | Guest OS | `Windows 7`, version `6.1.7601`, SP1, x64, `ProductType=1` |
 | Guest execution | QEMU exits `0`; both products run with the guest NIC disabled |
 | CLI contract | `pyfcstm-self-check.txt`: `total=15`, `passed=15`, `failed=0`, `status=passed` |
-| GUI contract | JSON report: `status=passed`, `passed=182`, `failed=0` |
+| GUI runtime contract | JSON report: `status=passed`, `passed=182`, `failed=0` |
+| GUI interaction contract | Windows QPA, logged-on session, non-zero window handle, `140/140` acceptance cases, and non-blank desktop screenshots |
+| GUI evidence | `desktop-before.png`, `desktop-gui-visible.png`, `desktop-after.png`, QEMU PPM framebuffer, stdout/stderr, session metadata, and per-case artifacts |
 | Provenance link | Guest SHA-256 values equal the hashes from the corresponding hosted build jobs |
 | Collector gate | `scripts/collect_win7_results.sh` exits `0`; the final workflow job is green |
 
@@ -101,7 +103,7 @@ The run publishes these artifacts:
 
 - `pyfcstm-win7-payload` - CLI executable, DSL fixture, and build metadata.
 - `fcstm-gui-win7-payload` - GUI executable, portable Java runtime, self-check reports, and build metadata.
-- `win7-verification-evidence` - guest OS information, result status, hashes, CLI/GUI self-check reports, Java version, and QEMU files.
+- `win7-verification-evidence` - guest OS information, result status, hashes, CLI/GUI self-check reports, Java version, interactive GUI screenshots/logs, per-case artifacts, and QEMU files.
 
 Build payloads are retained for 14 days. Verification evidence is retained for
 30 days. The ISO and guest system disk are never uploaded.
@@ -294,6 +296,39 @@ interactive login.
 
 The guest has no network. `QT_QPA_PLATFORM=offscreen` is set for the GUI
 self-check, testing executable/runtime behavior rather than a particular GPU.
+The GUI acceptance stage then explicitly switches to `QT_QPA_PLATFORM=windows`
+inside an automatically logged-on `ci` session. This distinction matters:
+`182/182` proves runtime/module behavior, while `140/140` proves real window
+creation, keyboard/mouse/file-dialog workflows, and visible desktop rendering.
+
+#### Interactive GUI acceptance contract
+
+[`guest/run-gui-acceptance.ps1`](guest/run-gui-acceptance.ps1) starts the
+upstream `fcstm-gui.exe --acceptance-check` process in the logged-on desktop,
+waits for a non-zero `MainWindowHandle`, records the Windows session and window
+identity, waits for the first paint, and captures the desktop before, during,
+and after the run. The acceptance runner's JSON is copied to the FAT result
+disk together with its stdout/stderr and every declared artifact. The host
+collector verifies each artifact's size and SHA-256 instead of trusting only
+the summary count.
+
+The acceptance corpus is the expected behavior reference from
+`fcstm-gui`'s own documented acceptance flow. The current 140 cases cover:
+
+| Area | Cases | Behavior represented |
+| --- | ---: | --- |
+| Documents, dirty state, source, imports, rename | 17 | open/reopen/cancel/failure recovery, edit/undo/redo/save, read-only imports, state renames |
+| Diagnostics and formulas | 16 | syntax/assembly/inspect/filter, conflicts/fixes, valid and invalid guard/effect/lifecycle/numeric formulas |
+| Model editing | 21 | add/edit/delete variables, events, states, transitions, guards, effects, and lifecycle actions |
+| Graph and simulation | 17 | refresh/fit/zoom/selection/reset/drag plus initialize/step/run/pause/continue/reset/stop |
+| Generation and export | 17 | Python/C/C++/poll/custom generation, overwrite behavior, DSL/Office/PlantUML/image/PDF/JSON export |
+| Tasks, cancellation, stale state | 30 | task registry, filtering, retry/cancel/redaction, transient work, cancellation, stale graph/simulation/generation/export |
+| Keyboard, dynamic cases, terminology, geometry | 22 | keyboard shortcuts, dynamic validation/recovery, terminology, workspace geometry and containment |
+
+The exact case names, evidence fingerprints, viewport, and artifact inventory
+are in `fcstm-gui-acceptance.json`; changes to the upstream acceptance corpus
+must change the expected counts in `guest/run-gui-ci.cmd` and the host
+collector together.
 
 #### CLI self-check contract
 
@@ -336,6 +371,14 @@ FAT image read-only through `mtools` and fails closed unless:
 - both guest hashes equal the Windows build artifact hashes;
 - `pyfcstm-self-check.txt` exists with `total=15`, `passed=15`, `failed=0`, and `status=passed`;
 - GUI JSON exists with `"status": "passed"`, `"passed": 182`, and zero failures;
+- interactive GUI JSON exists with `"status": "passed"`, `counts.total=140`,
+  `counts.passed=140`, and `counts.failed=0`;
+- `gui-session.txt` proves the process ran as user `ci` with Windows QPA, a
+  visible window, a non-zero handle, and successful exit;
+- all three desktop PNGs are valid, non-blank, and not identical; every
+  acceptance artifact listed in the JSON exists with matching size and hash;
+- QEMU has a valid `mode=kvm` or `mode=tcg` record, a non-blank canonical
+  `qemu-screen.ppm`, and at least one periodic framebuffer frame;
 - guest Java version and required logs exist.
 
 A green Windows build job alone is not enough: the final guest/evidence job must
@@ -539,9 +582,16 @@ Important evidence files:
 | `pyfcstm-self-check.txt` | Machine-readable 15-check CLI guest contract |
 | `pyfcstm-verify.log` / `pyfcstm-self-check-commands.log` | CLI self-check output and command transcripts |
 | `fcstm-gui-self-check.json` / `.log` | Machine-readable and human-readable guest self-check |
+| `fcstm-gui-acceptance.json` | Machine-readable 140-case interactive GUI report and artifact inventory |
+| `fcstm-gui-acceptance.stdout.log` / `.stderr.log` | Acceptance process logs from the real Win7 desktop session |
+| `run-gui-acceptance.log` / `gui-session.txt` | PowerShell launcher log, user/session/window metadata, and exit status |
+| `desktop-before.png` / `desktop-gui-visible.png` / `desktop-after.png` | Guest desktop screenshots before, during, and after GUI execution |
+| `fcstm-gui-acceptance-artifacts/` | Per-case screenshots and structured evidence produced by the upstream acceptance runner |
 | `java-version-guest.txt` | Java runtime used by the GUI |
 | `build-metadata.txt` files | Source revisions, tool versions, expected hashes |
-| `qemu-exit-status.txt` | Host-side QEMU exit status |
+| `qemu-exit-status.txt` / `qemu-acceleration.txt` | Host-side QEMU exit status and KVM/TCG mode |
+| `qemu-screen.ppm` / `qemu-screens/` | Canonical and periodic host-side virtual framebuffer screenshots |
+| `qemu.stderr.log` / `serial.log` | QEMU diagnostics and guest serial output (serial may be empty on stock Win7) |
 
 Minimal GUI JSON audit:
 
@@ -638,6 +688,9 @@ workflow with weak evidence is worse than a red workflow with a precise reason.
 |   |-- Autounattend.xml                 # Windows Setup answer file
 |   |-- install-hook.cmd                 # Installs SetupComplete hook
 |   |-- run-ci.cmd                       # Guest lifecycle and evidence writer
+|   |-- run-gui-ci.cmd                   # Interactive GUI task and result writer
+|   |-- run-gui-acceptance.ps1           # Real desktop GUI launcher and screenshots
+|   |-- capture-desktop.ps1              # WinForms desktop PNG capture
 |   |-- verify-cli.cmd                   # pyfcstm guest contract
 |   `-- verify-gui.cmd                   # fcstm-gui guest self-check contract
 |-- scripts/                             # Image, QEMU, build-policy, collector helpers

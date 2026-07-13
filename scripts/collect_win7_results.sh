@@ -154,6 +154,7 @@ for key, expected in {
     "user": "ci",
     "qt_qpa_platform": "windows",
     "window_visible": "true",
+    "process_has_exited": "True",
 }.items():
     if session.get(key) != expected:
         raise SystemExit("GUI session {}={!r}, expected {!r}".format(key, session.get(key), expected))
@@ -162,6 +163,18 @@ for key in ("session_id", "process_id", "window_process_id", "window_handle", "a
         raise SystemExit("GUI session field is not numeric: {}".format(key))
 if int(session["window_handle"]) <= 0 or session["acceptance_exit_code"] != "0":
     raise SystemExit("GUI session did not record a visible successful process")
+if int(session["window_process_id"]) != int(session["process_id"]):
+    raise SystemExit("GUI window belongs to a different process")
+
+self_check = json.loads((root / "fcstm-gui-self-check.json").read_text(encoding="utf-8"))
+if self_check.get("status") != "passed":
+    raise SystemExit("GUI self-check status is not passed")
+self_check_counts = self_check.get("counts", {})
+for key, expected in {"total": 182, "passed": 182, "failed": 0}.items():
+    if self_check_counts.get(key) != expected:
+        raise SystemExit("GUI self-check count {}={!r}, expected {!r}".format(
+            key, self_check_counts.get(key), expected
+        ))
 
 report_path = root / "fcstm-gui-acceptance.json"
 report = json.loads(report_path.read_text(encoding="utf-8"))
