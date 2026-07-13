@@ -91,7 +91,6 @@ shutdown /s /t 0 /f
 exit /b 0
 
 :schedule-ucrt-reboot
-> "%RUN_DIRECTORY%\ucrt-installed.txt" echo installed
 copy /Y "%PAYLOAD_DRIVE%\run-ci.cmd" "%WINDIR%\Setup\Scripts\run-ci-resume.cmd" >nul
 schtasks /create /tn PyfcstmWin7Poc /tr "cmd.exe /c call %WINDIR%\Setup\Scripts\run-ci-resume.cmd" /sc onstart /ru SYSTEM /rl HIGHEST /f >nul
 shutdown /r /t 0 /f
