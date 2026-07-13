@@ -45,7 +45,25 @@ if not exist "%RUN_DIRECTORY%\ucrt-installed.txt" (
         set "FAILURE=Windows 7 UCRT update was not found"
         goto :finish
     )
-    dism.exe /online /add-package /packagepath:"%PAYLOAD_DRIVE%\win7-ucrt.msu" /quiet /norestart > "%RUN_DIRECTORY%\ucrt-install.log" 2>&1
+    > "%RUN_DIRECTORY%\ucrt-install.log" echo Extracting the Windows 7 UCRT MSU to a CAB for Win7 DISM.
+    set "UCRT_DIRECTORY=%RUN_DIRECTORY%\ucrt"
+    mkdir "%UCRT_DIRECTORY%" >nul 2>&1
+    expand.exe -F:* "%PAYLOAD_DRIVE%\win7-ucrt.msu" "%UCRT_DIRECTORY%" >> "%RUN_DIRECTORY%\ucrt-install.log" 2>&1
+    if errorlevel 1 (
+        set "FAILURE=Windows 7 UCRT MSU extraction failed"
+        goto :finish
+    )
+    set "UCRT_CAB=%UCRT_DIRECTORY%\Windows6.1-KB3118401-x64.cab"
+    if not exist "%UCRT_CAB%" (
+        set "UCRT_CAB="
+        for /f "delims=" %%F in ('dir /b /a-d "%UCRT_DIRECTORY%\*.cab" 2^>nul') do if not defined UCRT_CAB set "UCRT_CAB=%UCRT_DIRECTORY%\%%F"
+    )
+    if not exist "%UCRT_CAB%" (
+        set "FAILURE=Windows 7 UCRT CAB was not found after MSU extraction"
+        goto :finish
+    )
+    >> "%RUN_DIRECTORY%\ucrt-install.log" echo Installing the extracted UCRT CAB with the Win7 servicing stack.
+    dism.exe /online /add-package /packagepath:"%UCRT_CAB%" /quiet /norestart >> "%RUN_DIRECTORY%\ucrt-install.log" 2>&1
     if errorlevel 3010 goto :schedule-ucrt-reboot
     if errorlevel 1 (
         set "FAILURE=Windows 7 UCRT update failed"
