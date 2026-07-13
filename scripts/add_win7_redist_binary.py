@@ -5,7 +5,10 @@ import sys
 from pathlib import Path
 
 
-MARKER = "\n# Use compressed PYZ archive\n"
+MARKERS = (
+    "\n# Use compressed PYZ archive\n",
+    "\n# Use compressed PYZ archive.\n",
+)
 
 
 def main() -> int:
@@ -28,11 +31,13 @@ def main() -> int:
     if addition in content:
         print(f"Redist DLL is already present in {spec_file}: {binary_file.name}", file=sys.stderr)
         return 65
-    if content.count(MARKER) != 1:
+    matching_markers = [marker for marker in MARKERS if content.count(marker) == 1]
+    if len(matching_markers) != 1:
         print(f"could not locate the generated-PYZ marker in {spec_file}", file=sys.stderr)
         return 65
 
-    spec_file.write_text(content.replace(MARKER, addition + MARKER), encoding="utf-8")
+    marker = matching_markers[0]
+    spec_file.write_text(content.replace(marker, addition + marker), encoding="utf-8")
     print(f"added {binary_file.name} from the Visual C++ Redist to {spec_file}")
     return 0
 

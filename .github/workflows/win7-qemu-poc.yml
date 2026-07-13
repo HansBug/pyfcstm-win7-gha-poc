@@ -371,7 +371,7 @@ jobs:
             printf 'fcstm_gui_exe_sha256=%s\n' "$gui_sha256"
             printf 'python_version=%s\n' "$(python --version)"
             printf 'pyinstaller_version=%s\n' "$(python -c 'import PyInstaller; print(PyInstaller.__version__)')"
-            printf 'pyfcstm_dependency=%s\n' "$(python -c 'import importlib.metadata; print(importlib.metadata.distribution("pyfcstm").version)')"
+            printf 'pyfcstm_dependency=%s\n' "$(python -c 'import importlib_metadata; print(importlib_metadata.distribution("pyfcstm").version)')"
           } > "$payload_dir/fcstm-gui-build-metadata.txt"
           printf 'fcstm_gui_commit=%s\n' "$fcstm_gui_commit" >> "$GITHUB_OUTPUT"
 
